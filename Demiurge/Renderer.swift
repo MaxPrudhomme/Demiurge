@@ -15,9 +15,9 @@ class Renderer: NSObject, MTKViewDelegate {
     var commandQueue: MTLCommandQueue!
     var uniformBuffer: MTLBuffer!
     
-    var mesh: Mesh_Cube!
+    var mesh: Mesh_Sphere!
     
-    var renderScale: Float = 0.65
+    var renderScale: Float = 0.5
     
     // Defined as degrees
     var initialAngle: SIMD2<Float> = SIMD2<Float>(30, 45)
@@ -43,7 +43,7 @@ class Renderer: NSObject, MTKViewDelegate {
         self.device = device
         self.commandQueue = device.makeCommandQueue()
         
-        mesh = Mesh_Cube(device: device)
+        mesh = Mesh_Sphere(device: device)
         
         setupDepthStencilStates()
         setupPipeline()
