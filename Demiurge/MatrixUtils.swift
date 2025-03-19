@@ -25,6 +25,20 @@ struct MatrixUtils {
         return matrix_float4x4(simd_quaternion(angle, normalize(axis)))
     }
 
+    static func rotationAroundAxes(xAngle: Float, yAngle: Float) -> matrix_float4x4 {
+        let rotationX = rotation(angle: xAngle, axis: SIMD3<Float>(1, 0, 0))
+        let rotationY = rotation(angle: yAngle, axis: SIMD3<Float>(0, 1, 0))
+        
+        // Combine rotations (order matters!)
+        return matrix_multiply(rotationX, rotationY)
+    }
+    
+    static func rotationAroundAxesInDegrees(xDegrees: Float, yDegrees: Float) -> matrix_float4x4 {
+        let xRadians = xDegrees * (.pi / 180.0)
+        let yRadians = yDegrees * (.pi / 180.0)
+        return rotationAroundAxes(xAngle: xRadians, yAngle: yRadians)
+    }
+    
     static func translation(x: Float, y: Float, z: Float) -> matrix_float4x4 {
         return matrix_float4x4(columns: (SIMD4<Float>(1, 0, 0, 0), SIMD4<Float>(0, 1, 0, 0), SIMD4<Float>(0, 0, 1, 0), SIMD4<Float>(x, y, z, 1)))
     }

@@ -20,7 +20,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var renderScale: Float = 0.65
     
     // Defined as degrees
-    var initialAngle: SIMD2<Float> = SIMD2<Float>(45, 45)
+    var initialAngle: SIMD2<Float> = SIMD2<Float>(30, 45)
     
     // Defined as radians
     var rotationAngle: SIMD2<Float> = SIMD2<Float>(0, 0)
@@ -48,6 +48,8 @@ class Renderer: NSObject, MTKViewDelegate {
         setupDepthStencilStates()
         setupPipeline()
         setupUniforms()
+        
+        rotationMatrix = MatrixUtils.rotationAroundAxesInDegrees(xDegrees: initialAngle.x, yDegrees: initialAngle.y)
     }
     
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -58,28 +60,24 @@ class Renderer: NSObject, MTKViewDelegate {
         let angleX = Float(translation.y) * sensitivity
         let angleY = Float(translation.x) * sensitivity
 
-        let rotationX = MatrixUtils.rotation(angle: angleX, axis: SIMD3<Float>(1, 0, 0))
-        let rotationY = MatrixUtils.rotation(angle: angleY, axis: SIMD3<Float>(0, 1, 0))
-
-        rotationMatrix = matrix_multiply(rotationX, rotationMatrix)
-        rotationMatrix = matrix_multiply(rotationMatrix, rotationY)
+        let rotation = MatrixUtils.rotationAroundAxes(xAngle: angleX, yAngle: angleY)
+        
+        rotationMatrix = matrix_multiply(rotation, rotationMatrix)
 
         rotationVelocity = SIMD2<Float>(Float(velocity.x) * sensitivity * 0.02, Float(velocity.y) * sensitivity * 0.02)
 
         isDragging = (gesture.state != .ended)
         gesture.setTranslation(.zero, in: gesture.view)
     }
-    
+
     func updateInertia() {
         let friction: Float = 0.98
 
         if !isDragging {
             if simd_length(rotationVelocity) > 0.0001 {
-                let rotationX = MatrixUtils.rotation(angle: rotationVelocity.y, axis: SIMD3<Float>(1, 0, 0))
-                let rotationY = MatrixUtils.rotation(angle: rotationVelocity.x, axis: SIMD3<Float>(0, 1, 0))
-
-                rotationMatrix = matrix_multiply(rotationX, rotationMatrix)
-                rotationMatrix = matrix_multiply(rotationMatrix, rotationY)
+                let rotation = MatrixUtils.rotationAroundAxes(xAngle: rotationVelocity.y, yAngle: rotationVelocity.x)
+                
+                rotationMatrix = matrix_multiply(rotation, rotationMatrix)
 
                 rotationVelocity *= friction
             } else {
@@ -111,20 +109,9 @@ class Renderer: NSObject, MTKViewDelegate {
         // Define the vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
 
-        // Position (SIMD3<Float>)
         vertexDescriptor.attributes[0].format = .float3
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.attributes[0].bufferIndex = 0
-
-        // UNUSED ! Normal (SIMD3<Float>)
-//        vertexDescriptor.attributes[1].format = .float3
-//        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
-//        vertexDescriptor.attributes[1].bufferIndex = 0
-
-        // UNUSED ! Texture Coordinates (SIMD2<Float>)
-//        vertexDescriptor.attributes[2].format = .float2
-//        vertexDescriptor.attributes[2].offset = MemoryLayout<SIMD3<Float>>.stride * 2
-//        vertexDescriptor.attributes[2].bufferIndex = 0
 
         // Layout: stride matches the full Vertex struct
         vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
