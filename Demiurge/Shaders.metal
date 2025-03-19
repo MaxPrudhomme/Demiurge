@@ -10,7 +10,6 @@ using namespace metal;
 
 struct VertexIn {
     float3 position [[attribute(0)]];
-    float4 color [[attribute(1)]];
 };
 
 struct VertexOut {
@@ -18,17 +17,12 @@ struct VertexOut {
     float4 color;
 };
 
-vertex VertexOut vertexShader(uint vertexID [[vertex_id]],
-                              constant float *vertices [[buffer(0)]],
-                              constant float4x4 &mvpMatrix [[buffer(1)]]) {
+vertex VertexOut vertexShader(VertexIn in [[stage_in]], constant float4x4 &mvpMatrix [[buffer(1)]]) {
     VertexOut out;
     
-    float3 position = float3(vertices[vertexID * 7], vertices[vertexID * 7 + 1], vertices[vertexID * 7 + 2]);
-    float4 color = float4(vertices[vertexID * 7 + 3], vertices[vertexID * 7 + 4], vertices[vertexID * 7 + 5], vertices[vertexID * 7 + 6]);
-    
-    out.position = mvpMatrix * float4(position, 1.0);
-    out.color = color;
-    
+    out.position = mvpMatrix * float4(in.position, 1.0);
+    out.color = float4(0.0, 0.2, 1.0, 1.0);
+
     return out;
 }
 
@@ -38,5 +32,5 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]]) {
 
 // Fragment shader for edges - always returns black
 fragment float4 edgeFragmentShader(VertexOut in [[stage_in]]) {
-    return float4(0.0, 0.0, 0.0, 1.0);
+    return float4(1.0, 1.0, 1.0, 1.0);
 }

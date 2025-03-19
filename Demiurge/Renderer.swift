@@ -13,17 +13,22 @@ class Renderer: NSObject, MTKViewDelegate {
     var pipelineState: MTLRenderPipelineState!
     var edgePipelineState: MTLRenderPipelineState!
     var commandQueue: MTLCommandQueue!
-    var mesh: Mesh!
     var uniformBuffer: MTLBuffer!
+    
+    var mesh: Mesh_Cube!
+    
+    // Defined as degrees, needs to be converted using toRadians
+    var initialAngle: SIMD2<Float> = SIMD2<Float>(0, 45)
+    
+    var renderScale: Float = 0.65
+    
     var rotationAngle: Float = 0.0
+    var rotationMatrix: matrix_float4x4 = matrix_identity_float4x4
+    var rotationVelocity: SIMD2<Float> = SIMD2<Float>(0, 0)
     
     var lastTouchLocation: CGPoint?
-    var rotationMatrix: matrix_float4x4 = matrix_identity_float4x4
-    
-    var rotationVelocity: SIMD2<Float> = SIMD2<Float>(0, 0)
     var isDragging: Bool = false
 
-    // Two depth stencil states:
     var triangleDepthStencilState: MTLDepthStencilState!
     var edgeDepthStencilState: MTLDepthStencilState!
     
@@ -36,10 +41,15 @@ class Renderer: NSObject, MTKViewDelegate {
         self.device = device
         self.commandQueue = device.makeCommandQueue()
         
+        mesh = Mesh_Cube(device: device)
+        
         setupDepthStencilStates()
-        mesh = Mesh(device: device)
         setupPipeline()
         setupUniforms()
+        
+        let rotationX = MatrixUtils.rotation(angle: initialAngle.y, axis: SIMD3<Float>(1, 0, 0))
+        let rotationY = MatrixUtils.rotation(angle: initialAngle.x, axis: SIMD3<Float>(0, 1, 0))
+        rotationMatrix = matrix_multiply(rotationX, rotationY)
     }
     
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -50,8 +60,8 @@ class Renderer: NSObject, MTKViewDelegate {
         let angleX = Float(translation.x) * sensitivity
         let angleY = Float(translation.y) * sensitivity
 
-        let rotationX = MatrixUtils.rotation(angle: angleY, axis: SIMD3<Float>(1, 0, 0))
-        let rotationY = MatrixUtils.rotation(angle: angleX, axis: SIMD3<Float>(0, 1, 0))
+        let rotationX = MatrixUtils.rotation(angle: angleX, axis: SIMD3<Float>(1, 0, 0))
+        let rotationY = MatrixUtils.rotation(angle: angleY, axis: SIMD3<Float>(0, 1, 0))
 
         rotationMatrix = matrix_multiply(rotationX, rotationMatrix)
         rotationMatrix = matrix_multiply(rotationMatrix, rotationY)
@@ -86,7 +96,6 @@ class Renderer: NSObject, MTKViewDelegate {
         triangleDescriptor.isDepthWriteEnabled = true
         triangleDepthStencilState = device.makeDepthStencilState(descriptor: triangleDescriptor)
         
-        // For drawing edges. Changing to .lessEqual tolerates small precision differences.
         let edgeDescriptor = MTLDepthStencilDescriptor()
         edgeDescriptor.depthCompareFunction = .lessEqual
         edgeDescriptor.isDepthWriteEnabled = false
@@ -101,18 +110,43 @@ class Renderer: NSObject, MTKViewDelegate {
             fatalError("Failed to create shader functions")
         }
         
+        // Define the vertex descriptor
+        let vertexDescriptor = MTLVertexDescriptor()
+
+        // Position (SIMD3<Float>)
+        vertexDescriptor.attributes[0].format = .float3
+        vertexDescriptor.attributes[0].offset = 0
+        vertexDescriptor.attributes[0].bufferIndex = 0
+
+        // UNUSED ! Normal (SIMD3<Float>)
+//        vertexDescriptor.attributes[1].format = .float3
+//        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
+//        vertexDescriptor.attributes[1].bufferIndex = 0
+
+        // UNUSED ! Texture Coordinates (SIMD2<Float>)
+//        vertexDescriptor.attributes[2].format = .float2
+//        vertexDescriptor.attributes[2].offset = MemoryLayout<SIMD3<Float>>.stride * 2
+//        vertexDescriptor.attributes[2].bufferIndex = 0
+
+        // Layout: stride matches the full Vertex struct
+        vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
+        vertexDescriptor.layouts[0].stepFunction = .perVertex
+
+        // Apply to pipeline descriptors
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.vertexFunction = vertexFunction
         pipelineDescriptor.fragmentFunction = fragmentFunction
         pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
-        
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor
+
         let edgePipelineDescriptor = MTLRenderPipelineDescriptor()
         edgePipelineDescriptor.vertexFunction = vertexFunction
         edgePipelineDescriptor.fragmentFunction = edgeFragmentFunction
         edgePipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         edgePipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
-        
+        edgePipelineDescriptor.vertexDescriptor = vertexDescriptor
+
         do {
             pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
             edgePipelineState = try device.makeRenderPipelineState(descriptor: edgePipelineDescriptor)
@@ -127,6 +161,10 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    
+    func toRadians(fromDegrees degrees: Float) -> Float {
+        return degrees * (.pi / 180.0)
+    }
     
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable,
@@ -153,12 +191,11 @@ class Renderer: NSObject, MTKViewDelegate {
         
         updateInertia()
         
-        // Update uniforms
         let aspect = Float(view.drawableSize.width / view.drawableSize.height)
         let projectionMatrix = MatrixUtils.perspective(fovy: .pi/3, aspect: aspect, nearZ: 0.1, farZ: 100)
-        var modelViewMatrix = MatrixUtils.translation(x: 0, y: 0, z: -2) // Keep the translation for positioning
-        modelViewMatrix = matrix_multiply(modelViewMatrix, rotationMatrix) // Apply rotation first
-        modelViewMatrix = matrix_multiply(modelViewMatrix, MatrixUtils.scale(x: 0.75, y: 0.75, z: 0.75)) // Then scale the cube
+        var modelViewMatrix = MatrixUtils.translation(x: 0, y: 0, z: -2)
+        modelViewMatrix = matrix_multiply(modelViewMatrix, rotationMatrix)
+        modelViewMatrix = matrix_multiply(modelViewMatrix, MatrixUtils.scale(x: renderScale, y: renderScale, z: renderScale))
         var mvpMatrix = matrix_multiply(projectionMatrix, modelViewMatrix)
         memcpy(uniformBuffer.contents(), &mvpMatrix, MemoryLayout<matrix_float4x4>.stride)
         
@@ -169,10 +206,9 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
         commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.indexCount, indexType: .uint16, indexBuffer: mesh.indexBuffer, indexBufferOffset: 0)
         
-        // Draw edges only where triangle depth is nearly equal (visible portions)
         commandEncoder.setDepthStencilState(edgeDepthStencilState)
         commandEncoder.setRenderPipelineState(edgePipelineState)
-        commandEncoder.setCullMode(.back) // Cull back–facing lines to hide hidden edges.
+        commandEncoder.setCullMode(.back)
         commandEncoder.drawIndexedPrimitives(type: .line, indexCount: mesh.edgeIndexCount, indexType: .uint16, indexBuffer: mesh.edgeIndexBuffer, indexBufferOffset: 0)
         
         commandEncoder.endEncoding()
