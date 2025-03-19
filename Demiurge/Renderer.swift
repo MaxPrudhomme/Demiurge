@@ -17,12 +17,14 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var mesh: Mesh_Cube!
     
-    // Defined as degrees, needs to be converted using toRadians
-    var initialAngle: SIMD2<Float> = SIMD2<Float>(0, 45)
-    
     var renderScale: Float = 0.65
     
-    var rotationAngle: Float = 0.0
+    // Defined as degrees
+    var initialAngle: SIMD2<Float> = SIMD2<Float>(45, 45)
+    
+    // Defined as radians
+    var rotationAngle: SIMD2<Float> = SIMD2<Float>(0, 0)
+    
     var rotationMatrix: matrix_float4x4 = matrix_identity_float4x4
     var rotationVelocity: SIMD2<Float> = SIMD2<Float>(0, 0)
     
@@ -46,10 +48,6 @@ class Renderer: NSObject, MTKViewDelegate {
         setupDepthStencilStates()
         setupPipeline()
         setupUniforms()
-        
-        let rotationX = MatrixUtils.rotation(angle: initialAngle.y, axis: SIMD3<Float>(1, 0, 0))
-        let rotationY = MatrixUtils.rotation(angle: initialAngle.x, axis: SIMD3<Float>(0, 1, 0))
-        rotationMatrix = matrix_multiply(rotationX, rotationY)
     }
     
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -57,8 +55,8 @@ class Renderer: NSObject, MTKViewDelegate {
         let velocity = gesture.velocity(in: gesture.view)
 
         let sensitivity: Float = 0.005
-        let angleX = Float(translation.x) * sensitivity
-        let angleY = Float(translation.y) * sensitivity
+        let angleX = Float(translation.y) * sensitivity
+        let angleY = Float(translation.x) * sensitivity
 
         let rotationX = MatrixUtils.rotation(angle: angleX, axis: SIMD3<Float>(1, 0, 0))
         let rotationY = MatrixUtils.rotation(angle: angleY, axis: SIMD3<Float>(0, 1, 0))
@@ -73,7 +71,7 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     func updateInertia() {
-        let friction: Float = 0.98 // Lower friction = slower stop
+        let friction: Float = 0.98
 
         if !isDragging {
             if simd_length(rotationVelocity) > 0.0001 {
@@ -162,8 +160,8 @@ class Renderer: NSObject, MTKViewDelegate {
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     
-    func toRadians(fromDegrees degrees: Float) -> Float {
-        return degrees * (.pi / 180.0)
+    func toRadians(fromDegrees degrees: SIMD2<Float>) -> SIMD2<Float> {
+        return SIMD2<Float>(x: degrees.x * (.pi / 180.0), y: degrees.y * (.pi / 180.0))
     }
     
     func draw(in view: MTKView) {
