@@ -30,3 +30,10 @@ class Mesh {
         edgeIndexCount = edgeIndices.count
     }
 }
+
+extension SIMD3 where Scalar == Float {
+    init(normalized v: SIMD3<Float>) {
+        let length = sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+        self.init(v.x / length, v.y / length, v.z / length)
+    }
+}
