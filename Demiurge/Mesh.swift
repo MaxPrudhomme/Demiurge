@@ -13,6 +13,7 @@ struct Vertex {
 
 class Mesh {
     var vertexBuffer: MTLBuffer
+    var vertexCount: Int
     
     var indexBuffer: MTLBuffer
     let indexCount: Int
@@ -20,13 +21,14 @@ class Mesh {
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int
 
-    init(device: MTLDevice, vertices: [Vertex], indices: [UInt16], edgeIndices: [UInt16]) {
+    init(device: MTLDevice, vertices: [Vertex], indices: [UInt32], edgeIndices: [UInt32]) {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: [])!
+        vertexCount = vertices.count
         
-        indexBuffer = device.makeBuffer(bytes: indices, length: indices.count * MemoryLayout<UInt16>.stride, options: [])!
+        indexBuffer = device.makeBuffer(bytes: indices, length: indices.count * MemoryLayout<UInt32>.stride, options: [])!
         indexCount = indices.count
         
-        edgeIndexBuffer = device.makeBuffer(bytes: edgeIndices, length: edgeIndices.count * MemoryLayout<UInt16>.stride, options: [])!
+        edgeIndexBuffer = device.makeBuffer(bytes: edgeIndices, length: edgeIndices.count * MemoryLayout<UInt32>.stride, options: [])!
         edgeIndexCount = edgeIndices.count
     }
 }

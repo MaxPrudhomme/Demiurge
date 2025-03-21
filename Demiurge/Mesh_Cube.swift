@@ -23,7 +23,7 @@ class Mesh_Cube: Mesh {
             Vertex(position: SIMD3(-0.5,  0.5, -0.5)),
         ]
 
-        let indices: [UInt16] = [
+        let indices: [UInt32] = [
             0, 1, 2, 2, 3, 0,  // Front face
             4, 5, 6, 6, 7, 4,  // Back face
             0, 4, 7, 7, 3, 0,  // Left face
@@ -32,7 +32,7 @@ class Mesh_Cube: Mesh {
             0, 1, 5, 5, 4, 0   // Bottom face
         ]
 
-        let edgeIndices: [UInt16] = [
+        let edgeIndices: [UInt32] = [
             0, 1, 1, 2, 2, 3, 3, 0,  // Front face edges
             4, 5, 5, 6, 6, 7, 7, 4,  // Back face edges
             0, 4, 1, 5, 2, 6, 3, 7   // Connecting edges

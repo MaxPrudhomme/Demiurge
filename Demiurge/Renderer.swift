@@ -1,10 +1,3 @@
-//
-//  Renderer.swift
-//  Demiurge
-//
-//  Created by Max PRUDHOMME on 17/03/2025.
-//
-
 import MetalKit
 import simd
 
@@ -12,6 +5,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var device: MTLDevice!
     var pipelineState: MTLRenderPipelineState!
     var edgePipelineState: MTLRenderPipelineState!
+    var vertexPipelineState: MTLRenderPipelineState!  // New pipeline for vertices
     var commandQueue: MTLCommandQueue!
     var uniformBuffer: MTLBuffer!
     
@@ -33,6 +27,10 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var triangleDepthStencilState: MTLDepthStencilState!
     var edgeDepthStencilState: MTLDepthStencilState!
+    var pointDepthStencilState: MTLDepthStencilState!  // New depth stencil state for points
+    
+    // Point size for vertex rendering
+    let vertexPointSize: Float = 20.0
     
     override init() {
         super.init()
@@ -96,13 +94,20 @@ class Renderer: NSObject, MTKViewDelegate {
         edgeDescriptor.depthCompareFunction = .lessEqual
         edgeDescriptor.isDepthWriteEnabled = false
         edgeDepthStencilState = device.makeDepthStencilState(descriptor: edgeDescriptor)
+        
+        // Point depth stencil state - similar to edges
+        let pointDescriptor = MTLDepthStencilDescriptor()
+        pointDescriptor.depthCompareFunction = .lessEqual
+        pointDescriptor.isDepthWriteEnabled = false
+        pointDepthStencilState = device.makeDepthStencilState(descriptor: pointDescriptor)
     }
     
     func setupPipeline() {
         guard let library = device.makeDefaultLibrary(),
               let vertexFunction = library.makeFunction(name: "vertexShader"),
               let fragmentFunction = library.makeFunction(name: "fragmentShader"),
-              let edgeFragmentFunction = library.makeFunction(name: "edgeFragmentShader") else {
+              let edgeFragmentFunction = library.makeFunction(name: "edgeFragmentShader"),
+              let vertexFragmentFunction = library.makeFunction(name: "vertexPointFragmentShader") else {
             fatalError("Failed to create shader functions")
         }
         
@@ -131,10 +136,19 @@ class Renderer: NSObject, MTKViewDelegate {
         edgePipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         edgePipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
         edgePipelineDescriptor.vertexDescriptor = vertexDescriptor
+        
+        // Vertex point pipeline
+        let vertexPointPipelineDescriptor = MTLRenderPipelineDescriptor()
+        vertexPointPipelineDescriptor.vertexFunction = vertexFunction
+        vertexPointPipelineDescriptor.fragmentFunction = vertexFragmentFunction
+        vertexPointPipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        vertexPointPipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
+        vertexPointPipelineDescriptor.vertexDescriptor = vertexDescriptor
 
         do {
             pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
             edgePipelineState = try device.makeRenderPipelineState(descriptor: edgePipelineDescriptor)
+            vertexPipelineState = try device.makeRenderPipelineState(descriptor: vertexPointPipelineDescriptor)
         } catch {
             fatalError("Failed to create pipeline state: \(error)")
         }
@@ -189,12 +203,24 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setRenderPipelineState(pipelineState)
         commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-        commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.indexCount, indexType: .uint16, indexBuffer: mesh.indexBuffer, indexBufferOffset: 0)
+        commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.indexCount, indexType: .uint32, indexBuffer: mesh.indexBuffer, indexBufferOffset: 0)
         
+        // Draw edges
         commandEncoder.setDepthStencilState(edgeDepthStencilState)
         commandEncoder.setRenderPipelineState(edgePipelineState)
         commandEncoder.setCullMode(.back)
-        commandEncoder.drawIndexedPrimitives(type: .line, indexCount: mesh.edgeIndexCount, indexType: .uint16, indexBuffer: mesh.edgeIndexBuffer, indexBufferOffset: 0)
+        commandEncoder.drawIndexedPrimitives(type: .line, indexCount: mesh.edgeIndexCount, indexType: .uint32, indexBuffer: mesh.edgeIndexBuffer, indexBufferOffset: 0)
+        
+        // Draw vertices as points
+        commandEncoder.setDepthStencilState(pointDepthStencilState)
+        commandEncoder.setRenderPipelineState(vertexPipelineState)
+        commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
+        commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+        // Set point size (you need to create a buffer for this)
+        var pointSize = vertexPointSize
+        let pointSizeBuffer = device.makeBuffer(bytes: &pointSize, length: MemoryLayout<Float>.size, options: [])
+        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)
+        commandEncoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: mesh.vertexCount)
         
         commandEncoder.endEncoding()
         commandBuffer.present(drawable)
