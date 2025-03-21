@@ -13,15 +13,9 @@ struct ContentView: View {
             MetalView()
                 .edgesIgnoringSafeArea(.all)
 
-            VStack {
-                HStack {
-                    Text("Demiurge")
-                        .font(.title)
-                        .padding()
-                    Spacer()
-                }
-                .background(Color.gray.opacity(0.5))
-
+            VStack { // Main App stack
+                ControlView()
+                
                 Spacer()
 
                 HStack {
