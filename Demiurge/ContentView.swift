@@ -8,13 +8,15 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject var renderControl = RenderControl()
+    
     var body: some View {
         ZStack {
-            MetalView()
+            MetalView(renderControl: renderControl)
                 .edgesIgnoringSafeArea(.all)
 
             VStack { // Main App stack
-                ControlView()
+                ControlView(renderControl: renderControl)
                 
                 Spacer()
 

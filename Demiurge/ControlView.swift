@@ -8,16 +8,17 @@
 import SwiftUI
 
 struct ControlView: View {
+    var renderControl: RenderControl
+    
     @State private var rotate = false
     @State private var bounce_glass = false
-    @State private var bounce_layer = false
     
     func autoRotate() {
-        
+        renderControl.rotate = true
     }
     
     func resetZoom() {
-
+        renderControl.rescale = true
     }
     
     var body: some View {
@@ -38,7 +39,7 @@ struct ControlView: View {
                     resetZoom()
                     bounce_glass.toggle()
                 }, label: {
-                    Image(systemName: "arrow.up.left.and.down.right.magnifyingglass")
+                    Image(systemName: "scale.3d")
                         .font(.system(size: 24))
                         .frame(width: 32, height: 32)
                         .symbolEffect(.bounce, value: bounce_glass)

@@ -5,10 +5,13 @@
 //  Created by Max PRUDHOMME on 17/03/2025.
 //
 
+import SwiftUI
 import MetalKit
 import simd
 
 class Renderer: NSObject, MTKViewDelegate {
+    var renderControl: RenderControl
+    
     var device: MTLDevice!
     var pipelineState: MTLRenderPipelineState!
     var edgePipelineState: MTLRenderPipelineState!
@@ -19,12 +22,16 @@ class Renderer: NSObject, MTKViewDelegate {
     var mesh: Mesh_Sphere!
     
     var renderScale: Float = 0.5
+    var baseScale: Float = 0.5
+    var initialScale: Float? = nil
+    var scalingSpeed: Float = 0.01
+    var isRescaling: Bool = false
     
     // Debug flags
     var showVertices: Bool = false
     
     // Defined as degrees
-    var initialAngle: SIMD2<Float> = SIMD2<Float>(120, 90)
+    var initialAngle: SIMD2<Float> = SIMD2<Float>(0, 0)
     
     // Defined as radians
     var rotationAngle: SIMD2<Float> = SIMD2<Float>(0, 0)
@@ -41,9 +48,17 @@ class Renderer: NSObject, MTKViewDelegate {
     
     let vertexPointSize: Float = 10.0
     
-    override init() {
-        super.init()
+    var minScale: Float = 0.01
+    var maxScale: Float = 1.8
+    
+    var scalingVelocity: Float = 0.0
+    var rotationSpeed: Float = 0.0025
+
+    init(renderControl: RenderControl) {
+        self.renderControl = renderControl
         
+        super.init()
+
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is not supported on this device")
         }
@@ -62,22 +77,82 @@ class Renderer: NSObject, MTKViewDelegate {
     @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
         let translation = gesture.translation(in: gesture.view)
         let velocity = gesture.velocity(in: gesture.view)
-
+ 
         let sensitivity: Float = 0.005
         let angleX = Float(translation.y) * sensitivity
         let angleY = Float(translation.x) * sensitivity
-
+ 
         let rotation = MatrixUtils.rotationAroundAxes(xAngle: angleX, yAngle: angleY)
         
         rotationMatrix = matrix_multiply(rotation, rotationMatrix)
-
+ 
         rotationVelocity = SIMD2<Float>(Float(velocity.x) * sensitivity * 0.02, Float(velocity.y) * sensitivity * 0.02)
-
+ 
         isDragging = (gesture.state != .ended)
+        
+        renderControl.rotate = false
+
         gesture.setTranslation(.zero, in: gesture.view)
     }
+    
+    @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        let scale = Float(gesture.scale)
 
-    func updateInertia() {
+        let sensitivity: Float = 0.1
+        let zoomAmount = (scale - 1.0) * sensitivity
+
+        renderScale = max(minScale, min(maxScale, renderScale + zoomAmount))
+
+        scalingVelocity = Float(gesture.velocity) * sensitivity * 0.02
+
+        gesture.scale = 1.0
+    }
+
+    func updateScalingInertia() {
+        let friction: Float = 0.95
+
+        if !renderControl.rescale {
+            if abs(scalingVelocity) > 0.0001 {
+                renderScale += scalingVelocity
+                scalingVelocity *= friction
+            } else {
+                scalingVelocity = 0
+            }
+
+            renderScale = max(minScale, min(maxScale, renderScale))
+        }
+    }
+
+    func updateRescale() {
+        if renderControl.rescale && renderScale != baseScale {
+            let speedMultiplier: Float = 10.0
+            let isUpscaling = renderScale < baseScale
+            
+            if isUpscaling {
+                renderScale += scalingSpeed * speedMultiplier
+                renderScale = min(renderScale, maxScale)
+                if renderScale >= baseScale {
+                    renderScale = baseScale
+                    renderControl.rescale = false
+                }
+            } else {
+                renderScale -= scalingSpeed * speedMultiplier
+                renderScale = max(renderScale, minScale)
+                if renderScale <= baseScale {
+                    renderScale = baseScale
+                    renderControl.rescale = false
+                }
+            }
+        }
+    }
+
+    func stopInertiaOnAutoRescale() {
+        if renderControl.rescale {
+            scalingVelocity = 0
+        }
+    }
+
+    func updateRotationInertia() {
         let friction: Float = 0.98
 
         if !isDragging {
@@ -92,7 +167,15 @@ class Renderer: NSObject, MTKViewDelegate {
             }
         }
     }
-    
+
+    func updateAutorotation() {
+        // Only start autorotation if the flag is true
+        if renderControl.rotate {
+            let rotationMatrixY = MatrixUtils.rotationAroundAxes(xAngle: 0, yAngle: rotationSpeed)
+            rotationMatrix = matrix_multiply(rotationMatrix, rotationMatrixY)
+        }
+    }
+
     func setupDepthStencilStates() {
         let triangleDescriptor = MTLDepthStencilDescriptor()
         triangleDescriptor.depthCompareFunction = .less
@@ -174,6 +257,10 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     func draw(in view: MTKView) {
+        updateAutorotation()
+        updateRescale()
+        updateScalingInertia()
+        
         guard let drawable = view.currentDrawable,
               let commandBuffer = commandQueue.makeCommandBuffer() else {
             return
@@ -196,7 +283,7 @@ class Renderer: NSObject, MTKViewDelegate {
             return
         }
         
-        updateInertia()
+        updateRotationInertia()
         
         let aspect = Float(view.drawableSize.width / view.drawableSize.height)
         let projectionMatrix = MatrixUtils.perspective(fovy: .pi/3, aspect: aspect, nearZ: 0.1, farZ: 100)

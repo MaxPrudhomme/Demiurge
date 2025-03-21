@@ -9,8 +9,10 @@ import SwiftUI
 import MetalKit
 
 struct MetalView: UIViewRepresentable {
+    var renderControl: RenderControl
+    
     func makeCoordinator() -> Renderer {
-        Renderer()
+        Renderer(renderControl: renderControl)
     }
 
     func makeUIView(context: Context) -> MTKView {
@@ -33,7 +35,9 @@ struct MetalView: UIViewRepresentable {
         metalView.clearDepth = 1.0
         
         let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.handlePan(_:)))
+        let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.handlePinch(_:)))
         metalView.addGestureRecognizer(panGesture)
+        metalView.addGestureRecognizer(pinchGesture)
         
         return metalView
     }
