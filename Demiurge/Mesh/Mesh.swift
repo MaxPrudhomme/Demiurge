@@ -11,21 +11,25 @@ struct Vertex {
     var position: SIMD3<Float>
 }
 
-class Mesh {
+class Mesh: ObservableObject {
     var vertexBuffer: MTLBuffer
     var vertexCount: Int
     
     var faceIndexBuffer: MTLBuffer
     let faceIndexCount: Int
     
-    var tileIndex: [[Int]] = []
+    @Published var tileIndex: [Set<Int>]
+    @Published var tileCount: Int
     
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int
 
-    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32]) {
+    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32], tileIndex: [Set<Int>]) {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: [])!
         vertexCount = vertices.count
+        
+        self.tileIndex = tileIndex
+        tileCount = tileIndex.count
         
         faceIndexBuffer = device.makeBuffer(bytes: faceIndices, length: faceIndices.count * MemoryLayout<UInt32>.stride, options: [])!
         faceIndexCount = faceIndices.count

@@ -12,6 +12,7 @@ class Mesh_Sphere: Mesh {
         var vertices: [Vertex]
         var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
+        var tileIndex: [Set<Int>] = []
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
@@ -21,13 +22,13 @@ class Mesh_Sphere: Mesh {
             radius: radius
         )
         
-        (vertices, faceIndices, edgeIndices) = Mesh_Sphere.createDoubleMesh(
+        (vertices, faceIndices, edgeIndices, tileIndex) = Mesh_Sphere.createDoubleMesh(
             originalVertices: vertices,
             indices: faceIndices,
             edgeIndices: edgeIndices
         )
         
-        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 })
+        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex)
     }
     
     private static func createIcosahedronVertices(radius: Float) -> [Vertex] {
@@ -178,10 +179,11 @@ class Mesh_Sphere: Mesh {
         )
     }
     
-    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]]) {
+    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]], [Set<Int>]) {
         var newVertices: [Vertex] = []
         var newFaceIndices: [[UInt32]] = []
         var newEdgeIndices: [[UInt32]] = []
+        var tileIndex: [Set<Int>] = []
         
         var midpoints: [String : Vertex] = [:]
         
@@ -243,9 +245,10 @@ class Mesh_Sphere: Mesh {
                         newFaceIndices.append([UInt32(faceMidpointIndex), UInt32(midpoint1Index), UInt32(midpoint2Index)])
                     }
                 }
+                tileIndex.append(tileIndexes)
             }
         }
         
-        return (newVertices, newFaceIndices, newEdgeIndices)
+        return (newVertices, newFaceIndices, newEdgeIndices, tileIndex)
     }
 }
