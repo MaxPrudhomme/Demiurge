@@ -8,27 +8,26 @@
 import MetalKit
 
 class Mesh_Sphere: Mesh {
-    init(device: MTLDevice, radius: Float = 1.0, subdivisions: Int = 0) {
+    init(device: MTLDevice, radius: Float = 1.0, subdivisions: Int = 3) {
         var vertices: [Vertex]
-        var newVertices: [Vertex]
-        var indices: [[UInt32]] = []
+        var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
-        (vertices, indices, edgeIndices) = Mesh_Sphere.subdivideAndTruncate(
+        (vertices, faceIndices, edgeIndices) = Mesh_Sphere.subdivideAndTruncate(
             originalVertices: originalVertices,
             subdivisions: subdivisions,
             radius: radius
         )
         
-        (newVertices, _, edgeIndices) = Mesh_Sphere.createDoubleMesh(
+        (vertices, faceIndices, edgeIndices) = Mesh_Sphere.createDoubleMesh(
             originalVertices: vertices,
-            indices: indices,
+            indices: faceIndices,
             edgeIndices: edgeIndices
         )
         
-        super.init(device: device, vertices: newVertices, indices: [0, 0, 0], edgeIndices: edgeIndices.flatMap { $0 })
+        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 })
     }
     
     private static func createIcosahedronVertices(radius: Float) -> [Vertex] {
@@ -161,13 +160,16 @@ class Mesh_Sphere: Mesh {
         }
     }
     
-    private static func addEdge(_ edge: [UInt32], in edges: inout [[UInt32]]) -> Int {
-        if let existingIndex = edges.firstIndex(of: edge) {
-            return existingIndex
-        } else {
-            edges.append(edge)
-            return edges.count - 1
+    private static func getFaceMidpoint(_ face: [Vertex]) -> Vertex {
+        var sum: SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
+        
+        for vertex in face {
+            sum += vertex.position
         }
+        
+        let average = sum / Float(face.count)
+        
+        return Vertex(position: average)
     }
     
     private static func getMidpoint(_ p1: Vertex, _ p2: Vertex, _ p3: Vertex) -> Vertex {
@@ -200,6 +202,12 @@ class Mesh_Sphere: Mesh {
                 }
             }
             
+            let associatedMidpoints: [Vertex] = associatedFaces.map { midpoints["face_\(indices[$0])"]! }
+            
+            let faceMidpointIndex = addVertexIfNotProcessed(getFaceMidpoint(associatedMidpoints), in: &newVertices)
+            
+            var tileIndexes: Set<Int> = [faceMidpointIndex]
+            
             // Process all pairs of adjacent faces around this vertex
             for i in 0..<associatedFaces.count {
                 let faceIndex1 = associatedFaces[i]
@@ -227,13 +235,16 @@ class Mesh_Sphere: Mesh {
                         let midpoint1Index = addVertexIfNotProcessed(midpoint1, in: &newVertices)
                         let midpoint2Index = addVertexIfNotProcessed(midpoint2, in: &newVertices)
                         
+                        tileIndexes.insert(midpoint1Index)
+                        tileIndexes.insert(midpoint2Index)
+                        
                         // Add edge between these midpoints
                         newEdgeIndices.append([UInt32(midpoint1Index), UInt32(midpoint2Index)])
+                        newFaceIndices.append([UInt32(faceMidpointIndex), UInt32(midpoint1Index), UInt32(midpoint2Index)])
                     }
                 }
             }
         }
-        
         
         return (newVertices, newFaceIndices, newEdgeIndices)
     }

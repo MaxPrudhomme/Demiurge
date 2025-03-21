@@ -1,3 +1,10 @@
+//
+//  Renderer.swift
+//  Demiurge
+//
+//  Created by Max PRUDHOMME on 17/03/2025.
+//
+
 import MetalKit
 import simd
 
@@ -5,7 +12,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var device: MTLDevice!
     var pipelineState: MTLRenderPipelineState!
     var edgePipelineState: MTLRenderPipelineState!
-    var vertexPipelineState: MTLRenderPipelineState!  // New pipeline for vertices
+    var vertexPipelineState: MTLRenderPipelineState!
     var commandQueue: MTLCommandQueue!
     var uniformBuffer: MTLBuffer!
     
@@ -13,8 +20,11 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var renderScale: Float = 0.5
     
+    // Debug flags
+    var showVertices: Bool = false
+    
     // Defined as degrees
-    var initialAngle: SIMD2<Float> = SIMD2<Float>(30, 45)
+    var initialAngle: SIMD2<Float> = SIMD2<Float>(120, 90)
     
     // Defined as radians
     var rotationAngle: SIMD2<Float> = SIMD2<Float>(0, 0)
@@ -27,10 +37,9 @@ class Renderer: NSObject, MTKViewDelegate {
 
     var triangleDepthStencilState: MTLDepthStencilState!
     var edgeDepthStencilState: MTLDepthStencilState!
-    var pointDepthStencilState: MTLDepthStencilState!  // New depth stencil state for points
+    var pointDepthStencilState: MTLDepthStencilState!
     
-    // Point size for vertex rendering
-    let vertexPointSize: Float = 20.0
+    let vertexPointSize: Float = 10.0
     
     override init() {
         super.init()
@@ -95,7 +104,6 @@ class Renderer: NSObject, MTKViewDelegate {
         edgeDescriptor.isDepthWriteEnabled = false
         edgeDepthStencilState = device.makeDepthStencilState(descriptor: edgeDescriptor)
         
-        // Point depth stencil state - similar to edges
         let pointDescriptor = MTLDepthStencilDescriptor()
         pointDescriptor.depthCompareFunction = .lessEqual
         pointDescriptor.isDepthWriteEnabled = false
@@ -198,29 +206,33 @@ class Renderer: NSObject, MTKViewDelegate {
         var mvpMatrix = matrix_multiply(projectionMatrix, modelViewMatrix)
         memcpy(uniformBuffer.contents(), &mvpMatrix, MemoryLayout<matrix_float4x4>.stride)
         
+        var pointSize = vertexPointSize
+        let pointSizeBuffer = device.makeBuffer(bytes: &pointSize, length: MemoryLayout<Float>.size, options: [])
+
         // Draw filled triangles
         commandEncoder.setDepthStencilState(triangleDepthStencilState)
         commandEncoder.setRenderPipelineState(pipelineState)
         commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-        commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.indexCount, indexType: .uint32, indexBuffer: mesh.indexBuffer, indexBufferOffset: 0)
-        
+        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
+        commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.faceIndexCount, indexType: .uint32, indexBuffer: mesh.faceIndexBuffer, indexBufferOffset: 0)
+
         // Draw edges
         commandEncoder.setDepthStencilState(edgeDepthStencilState)
         commandEncoder.setRenderPipelineState(edgePipelineState)
         commandEncoder.setCullMode(.back)
+        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
         commandEncoder.drawIndexedPrimitives(type: .line, indexCount: mesh.edgeIndexCount, indexType: .uint32, indexBuffer: mesh.edgeIndexBuffer, indexBufferOffset: 0)
-        
-        // Draw vertices as points
-        commandEncoder.setDepthStencilState(pointDepthStencilState)
-        commandEncoder.setRenderPipelineState(vertexPipelineState)
-        commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
-        commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-        // Set point size (you need to create a buffer for this)
-        var pointSize = vertexPointSize
-        let pointSizeBuffer = device.makeBuffer(bytes: &pointSize, length: MemoryLayout<Float>.size, options: [])
-        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)
-        commandEncoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: mesh.vertexCount)
+
+        if showVertices {
+            // Draw vertices as points
+            commandEncoder.setDepthStencilState(pointDepthStencilState)
+            commandEncoder.setRenderPipelineState(vertexPipelineState)
+            commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
+            commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+            commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)
+            commandEncoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: mesh.vertexCount)
+        }
         
         commandEncoder.endEncoding()
         commandBuffer.present(drawable)

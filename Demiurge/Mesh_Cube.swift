@@ -38,6 +38,6 @@ class Mesh_Cube: Mesh {
             0, 4, 1, 5, 2, 6, 3, 7   // Connecting edges
         ]
 
-        super.init(device: device, vertices: vertices, indices: indices, edgeIndices: edgeIndices)
+        super.init(device: device, vertices: vertices, faceIndices: indices, edgeIndices: edgeIndices)
     }
 }

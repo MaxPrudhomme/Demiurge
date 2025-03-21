@@ -15,18 +15,20 @@ class Mesh {
     var vertexBuffer: MTLBuffer
     var vertexCount: Int
     
-    var indexBuffer: MTLBuffer
-    let indexCount: Int
+    var faceIndexBuffer: MTLBuffer
+    let faceIndexCount: Int
+    
+    var tileIndex: [[Int]] = []
     
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int
 
-    init(device: MTLDevice, vertices: [Vertex], indices: [UInt32], edgeIndices: [UInt32]) {
+    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32]) {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: [])!
         vertexCount = vertices.count
         
-        indexBuffer = device.makeBuffer(bytes: indices, length: indices.count * MemoryLayout<UInt32>.stride, options: [])!
-        indexCount = indices.count
+        faceIndexBuffer = device.makeBuffer(bytes: faceIndices, length: faceIndices.count * MemoryLayout<UInt32>.stride, options: [])!
+        faceIndexCount = faceIndices.count
         
         edgeIndexBuffer = device.makeBuffer(bytes: edgeIndices, length: edgeIndices.count * MemoryLayout<UInt32>.stride, options: [])!
         edgeIndexCount = edgeIndices.count
