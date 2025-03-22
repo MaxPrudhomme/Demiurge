@@ -69,9 +69,9 @@ class Renderer: NSObject, MTKViewDelegate {
         self.device = device
         self.commandQueue = device.makeCommandQueue()
         
-        orchestrator = Orchestrator(renderControl: renderControl)
-        
         mesh = Mesh_Sphere(device: device, subdivisions: subdivisions)
+        
+        orchestrator = Orchestrator(renderControl: renderControl, device: device)
         
         setupDepthStencilStates()
         setupPipeline()

@@ -6,26 +6,20 @@
 //
 
 import Foundation
+import MetalKit
 
 let sizes: [Int] = [12, 42, 162, 642, 2562]
 
 class Orchestrator {
     var renderControl: RenderControl
     
-    let Elevation: Elevation
+    let elevation: Elevation
     
     var mapElevation: [Float] = []
     
     
-    init(renderControl: RenderControl) {
+    init(renderControl: RenderControl, device: MTLDevice) {
         self.renderControl = renderControl
-        self.Elevation = Demiurge.Elevation(tectonicActivityFactor: renderControl.tectonicActivityFactor, volcanicActivityFactor: renderControl.volcanicActivityFactor, noiseFrequency: renderControl.noiseFrequency, noiseAmplitude: renderControl.noiseAmplitude)
-    }
-    
-    func run() -> [Float]{
-        let tiles: Int = sizes[renderControl.subdivisions]
-        mapElevation = Elevation.generateElevationMap(size: tiles)
-        
-        return mapElevation
+        self.elevation = Elevation(device: device)
     }
 }
