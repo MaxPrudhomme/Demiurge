@@ -245,8 +245,8 @@ class Mesh_Sphere: Mesh {
                         newFaceIndices.append([UInt32(faceMidpointIndex), UInt32(midpoint1Index), UInt32(midpoint2Index)])
                     }
                 }
-                tileIndex.append(tileIndexes)
             }
+            tileIndex.append(tileIndexes)
         }
         
         return (newVertices, newFaceIndices, newEdgeIndices, tileIndex)

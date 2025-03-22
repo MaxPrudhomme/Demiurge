@@ -19,7 +19,7 @@ class Mesh: ObservableObject {
     let faceIndexCount: Int
     
     @Published var tileIndex: [Set<Int>]
-    @Published var tileCount: Int
+    let tileCount: Int
     
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int

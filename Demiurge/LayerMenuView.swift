@@ -31,7 +31,7 @@ struct LayerMenuView: View {
                 Label("Elevation", systemImage: "mountain.2")
                 .tag("Elevation")
                 
-                Label("All layers", systemImage: "square.3.layers.3d")
+                Label("All layers", systemImage: "globe.americas")
                 .tag("All layers")
             }
         } label: {

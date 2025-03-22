@@ -10,7 +10,9 @@ import MetalKit
 import simd
 
 class Renderer: NSObject, MTKViewDelegate {
-    var renderControl: RenderControl
+    var renderControl: RenderControl!
+    
+    var orchestrator : Orchestrator!
     
     var device: MTLDevice!
     var pipelineState: MTLRenderPipelineState!
@@ -20,6 +22,7 @@ class Renderer: NSObject, MTKViewDelegate {
     var uniformBuffer: MTLBuffer!
     
     var mesh: Mesh_Sphere!
+    var subdivisions: Int
     
     var renderScale: Float = 0.5
     var baseScale: Float = 0.5
@@ -56,6 +59,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
     init(renderControl: RenderControl) {
         self.renderControl = renderControl
+        self.subdivisions = renderControl.subdivisions
         
         super.init()
 
@@ -65,7 +69,9 @@ class Renderer: NSObject, MTKViewDelegate {
         self.device = device
         self.commandQueue = device.makeCommandQueue()
         
-        mesh = Mesh_Sphere(device: device)
+        orchestrator = Orchestrator(renderControl: renderControl)
+        
+        mesh = Mesh_Sphere(device: device, subdivisions: subdivisions)
         
         setupDepthStencilStates()
         setupPipeline()
