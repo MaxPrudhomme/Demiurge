@@ -13,10 +13,7 @@ let sizes: [Int] = [12, 42, 162, 642, 2562]
 class Orchestrator {
     var renderControl: RenderControl
     
-    let elevation: Elevation
-    
-    var mapElevation: [Float] = []
-    
+    let elevation: Elevation    
     
     init(renderControl: RenderControl, device: MTLDevice) {
         self.renderControl = renderControl
