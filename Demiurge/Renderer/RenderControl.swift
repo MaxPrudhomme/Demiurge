@@ -9,11 +9,11 @@ import SwiftUI
 
 class RenderControl: ObservableObject {
     // Renderer Controller
-    @Published var rotate: Bool = false
+    @Published var rotate: Bool = true
     @Published var rescale: Bool = false
     
     // Mesh Controller
-    @Published var subdivisions: Int = 2
+    @Published var subdivisions: Int = 0
     
     // Orchestrator Controller
     

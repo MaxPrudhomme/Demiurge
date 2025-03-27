@@ -12,7 +12,7 @@ class Mesh_Sphere: Mesh {
         var vertices: [Vertex]
         var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
-        var tileIndex: [Set<Int>] = []
+        var tileIndex: [[[Int]]	] = []
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
@@ -179,11 +179,11 @@ class Mesh_Sphere: Mesh {
         )
     }
     
-    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]], [Set<Int>]) {
+    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]], [[[Int]]]) {
         var newVertices: [Vertex] = []
         var newFaceIndices: [[UInt32]] = []
         var newEdgeIndices: [[UInt32]] = []
-        var tileIndex: [Set<Int>] = []
+        var tileIndex: [[[Int]]] = []
         
         var midpoints: [String : Vertex] = [:]
         
@@ -208,7 +208,7 @@ class Mesh_Sphere: Mesh {
             
             let faceMidpointIndex = addVertexIfNotProcessed(getFaceMidpoint(associatedMidpoints), in: &newVertices)
             
-            var tileIndexes: Set<Int> = [faceMidpointIndex]
+            var tileIndexes: [[Int]] = []
             
             // Process all pairs of adjacent faces around this vertex
             for i in 0..<associatedFaces.count {
@@ -237,8 +237,7 @@ class Mesh_Sphere: Mesh {
                         let midpoint1Index = addVertexIfNotProcessed(midpoint1, in: &newVertices)
                         let midpoint2Index = addVertexIfNotProcessed(midpoint2, in: &newVertices)
                         
-                        tileIndexes.insert(midpoint1Index)
-                        tileIndexes.insert(midpoint2Index)
+                        tileIndexes.append([faceMidpointIndex, midpoint1Index, midpoint2Index])
                         
                         // Add edge between these midpoints
                         newEdgeIndices.append([UInt32(midpoint1Index), UInt32(midpoint2Index)])

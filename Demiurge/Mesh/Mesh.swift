@@ -18,13 +18,13 @@ class Mesh: ObservableObject {
     var faceIndexBuffer: MTLBuffer
     let faceIndexCount: Int
     
-    @Published var tileIndex: [Set<Int>]
+    @Published var tileIndex: [[[Int]]]
     let tileCount: Int
     
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int
-
-    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32], tileIndex: [Set<Int>]) {
+    
+    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32], tileIndex: [[[Int]]]) {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: [])!
         vertexCount = vertices.count
         

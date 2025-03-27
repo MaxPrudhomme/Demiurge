@@ -57,6 +57,8 @@ class Renderer: NSObject, MTKViewDelegate {
     var scalingVelocity: Float = 0.0
     var rotationSpeed: Float = 0.0025
 
+    var colorBuffer: MTLBuffer?
+
     init(renderControl: RenderControl) {
         self.renderControl = renderControl
         self.subdivisions = renderControl.subdivisions
@@ -65,7 +67,7 @@ class Renderer: NSObject, MTKViewDelegate {
 
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is not supported on this device")
-        }
+        }            
         self.device = device
         self.commandQueue = device.makeCommandQueue()
         
@@ -307,6 +309,9 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setRenderPipelineState(pipelineState)
         commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+        if let colorBuffer = colorBuffer {
+            commandEncoder.setVertexBuffer(colorBuffer, offset: 0, index: 2)
+        }
         commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
         commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.faceIndexCount, indexType: .uint32, indexBuffer: mesh.faceIndexBuffer, indexBufferOffset: 0)
 
