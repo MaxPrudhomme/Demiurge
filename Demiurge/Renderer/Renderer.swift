@@ -57,6 +57,8 @@ class Renderer: NSObject, MTKViewDelegate {
     var scalingVelocity: Float = 0.0
     var rotationSpeed: Float = 0.0025
 
+    var currentSubdivisions: Int = 3
+    
     init(renderControl: RenderControl) {
         self.renderControl = renderControl
         self.subdivisions = renderControl.subdivisions
@@ -72,6 +74,8 @@ class Renderer: NSObject, MTKViewDelegate {
         mesh = Mesh_Sphere(device: device, subdivisions: subdivisions)
 
         orchestrator = Orchestrator(renderControl: renderControl, device: device, mesh: mesh)
+        
+        currentSubdivisions = renderControl.subdivisions
         
         setupDepthStencilStates()
         setupPipeline()
@@ -182,6 +186,20 @@ class Renderer: NSObject, MTKViewDelegate {
         }
     }
 
+    func updateMesh() {
+        if renderControl.subdivisions == currentSubdivisions {
+            return
+        }
+        
+        let newMesh = Mesh_Sphere(device: device, subdivisions: renderControl.subdivisions)
+        let newOrchestrator: Orchestrator = Orchestrator(renderControl: renderControl, device: device, mesh: newMesh)
+        
+        mesh = newMesh
+        orchestrator = newOrchestrator
+        
+        currentSubdivisions = renderControl.subdivisions
+    }
+    
     func setupDepthStencilStates() {
         let triangleDescriptor = MTLDepthStencilDescriptor()
         triangleDescriptor.depthCompareFunction = .less
@@ -267,6 +285,8 @@ class Renderer: NSObject, MTKViewDelegate {
         updateAutorotation()
         updateRescale()
         updateScalingInertia()
+        
+        updateMesh()
         
         guard let drawable = view.currentDrawable,
               let commandBuffer = commandQueue.makeCommandBuffer() else {

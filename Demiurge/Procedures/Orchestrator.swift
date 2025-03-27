@@ -34,7 +34,7 @@ class Orchestrator {
         }
 
         // Send the color map to the changeColorMap method
-//        changeColorMap(map: grayScaleMap)
+        changeColorMap(map: grayScaleMap)
     }
     
     func changeColorMap(map: [SIMD4<Float>]) {

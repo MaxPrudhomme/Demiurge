@@ -12,6 +12,7 @@ struct ControlView: View {
     
     @State private var rotate = false
     @State private var bounce_glass = false
+    @State private var bounce_hexagon = false
     
     func autoRotate() {
         renderControl.rotate = true
@@ -24,6 +25,9 @@ struct ControlView: View {
     var body: some View {
         VStack {
             VStack { // First panel stack
+                SizeMenuView(renderControl: renderControl)
+                .padding(8)
+                
                 Button(action: {
                     autoRotate()
                     rotate.toggle()
@@ -33,7 +37,8 @@ struct ControlView: View {
                         .frame(width: 32, height: 32)
                         .symbolEffect(.rotate.wholeSymbol, options: .nonRepeating, value: rotate)
                 })
-                .padding(8)
+                .padding(.leading, 8)
+                .padding(.trailing, 8)
                 
                 Button(action: {
                     resetZoom()
@@ -44,9 +49,7 @@ struct ControlView: View {
                         .frame(width: 32, height: 32)
                         .symbolEffect(.bounce, value: bounce_glass)
                 })
-                .padding(.bottom, 8)
-                .padding(.leading, 8)
-                .padding(.trailing, 8)
+                .padding(8)
             }
             .background(Material.regularMaterial)
             .cornerRadius(12)
