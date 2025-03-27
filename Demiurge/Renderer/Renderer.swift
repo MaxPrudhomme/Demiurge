@@ -72,7 +72,7 @@ class Renderer: NSObject, MTKViewDelegate {
         self.commandQueue = device.makeCommandQueue()
         
         mesh = Mesh_Sphere(device: device, subdivisions: subdivisions)
-        
+
         orchestrator = Orchestrator(renderControl: renderControl, device: device)
         
         setupDepthStencilStates()
@@ -213,10 +213,16 @@ class Renderer: NSObject, MTKViewDelegate {
         // Define the vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
 
+        // Vertex Position
         vertexDescriptor.attributes[0].format = .float3
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.attributes[0].bufferIndex = 0
 
+        // Vertex color
+        vertexDescriptor.attributes[1].format = .float4
+        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
+        vertexDescriptor.attributes[1].bufferIndex = 0
+        
         // Layout: stride matches the full Vertex struct
         vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
         vertexDescriptor.layouts[0].stepFunction = .perVertex
@@ -309,9 +315,7 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setRenderPipelineState(pipelineState)
         commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-        if let colorBuffer = colorBuffer {
-            commandEncoder.setVertexBuffer(colorBuffer, offset: 0, index: 2)
-        }
+
         commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
         commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.faceIndexCount, indexType: .uint32, indexBuffer: mesh.faceIndexBuffer, indexBufferOffset: 0)
 

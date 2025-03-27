@@ -10,11 +10,12 @@ using namespace metal;
 
 struct VertexIn {
     float3 position [[attribute(0)]];
+    float4 color [[attribute(1)]];
 };
 
 struct VertexOut {
     float4 position [[position]];
-    float4 color;
+    float4 color [[flat]];
     float pointSize [[point_size]];
 };
 
@@ -29,7 +30,7 @@ vertex VertexOut vertexShader(VertexIn in [[stage_in]],
     VertexOut out;
     
     out.position = mvpMatrix * float4(in.position, 1.0);
-    out.color = float4(0.0, 0.2, 1.0, 1.0);
+    out.color = in.color;
     out.pointSize = pointSizeBuffer.pointSize;
 
     return out;

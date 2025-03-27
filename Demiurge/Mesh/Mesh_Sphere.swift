@@ -12,7 +12,7 @@ class Mesh_Sphere: Mesh {
         var vertices: [Vertex]
         var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
-        var tileIndex: [[[Int]]	] = []
+        var tileIndex: [[[Int]]] = []
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
@@ -236,6 +236,8 @@ class Mesh_Sphere: Mesh {
                         // Add midpoints to vertices array if not already there
                         let midpoint1Index = addVertexIfNotProcessed(midpoint1, in: &newVertices)
                         let midpoint2Index = addVertexIfNotProcessed(midpoint2, in: &newVertices)
+                        
+                        newVertices[faceMidpointIndex].color = SIMD4<Float>(Float.random(in: 0...1), Float.random(in: 0...1), Float.random(in: 0...1), 1)
                         
                         tileIndexes.append([faceMidpointIndex, midpoint1Index, midpoint2Index])
                         

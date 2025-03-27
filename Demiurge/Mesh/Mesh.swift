@@ -9,6 +9,7 @@ import MetalKit
 
 struct Vertex {
     var position: SIMD3<Float>
+    var color: SIMD4<Float> = SIMD4<Float>(0, 0, 0, 0)
 }
 
 class Mesh: ObservableObject {
