@@ -13,7 +13,7 @@ class RenderControl: ObservableObject {
     @Published var rescale: Bool = false
     
     // Mesh Controller
-    @Published var subdivisions: Int = 0
+    @Published var subdivisions: Int = 2
     
     // Orchestrator Controller
     

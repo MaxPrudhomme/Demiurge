@@ -6,14 +6,40 @@
 //
 
 import MetalKit
+import Foundation
 
 class Mesh_Sphere: Mesh {
     init(device: MTLDevice, radius: Float = 1.0, subdivisions: Int = 3) {
-        var vertices: [Vertex]
+        var vertices: [Vertex] = []
         var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
         var tileIndex: [Int] = []
         var colors: [SIMD4<Float>] = []
+
+        guard let filePath = Bundle.main.url(forResource: "Mesh_Sphere_\(subdivisions)", withExtension: "bin") else {
+            let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
+            (vertices, faceIndices, edgeIndices) = Mesh_Sphere.subdivideAndTruncate(
+                originalVertices: originalVertices,
+                subdivisions: subdivisions,
+                radius: radius
+            )
+            (vertices, faceIndices, edgeIndices, colors, tileIndex) = Mesh_Sphere.createDoubleMesh(
+                originalVertices: vertices,
+                indices: faceIndices,
+                edgeIndices: edgeIndices
+            )
+            super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex, colors: colors, subdivisions: subdivisions)
+            return
+        }
+
+        let fileManager = FileManager.default
+        // Check if file exists at the resolved URL
+        if fileManager.fileExists(atPath: filePath.path) {
+            super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex, colors: colors, subdivisions: subdivisions, meshURL: filePath)
+            return
+        } else {
+            print("File not found: \(filePath.path)")
+        }
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
@@ -29,7 +55,7 @@ class Mesh_Sphere: Mesh {
             edgeIndices: edgeIndices
         )
         
-        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex, colors: colors)
+        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex, colors: colors, subdivisions: subdivisions)
     }
     
     private static func createIcosahedronVertices(radius: Float) -> [Vertex] {
