@@ -37,8 +37,10 @@ class Mesh_Cube: Mesh {
             4, 5, 5, 6, 6, 7, 7, 4,  // Back face edges
             0, 4, 1, 5, 2, 6, 3, 7   // Connecting edges
         ]
-        let tileIndex: [[[Int]]] = []
+        let tileIndex: [Int] = []
 
-        super.init(device: device, vertices: vertices, faceIndices: indices, edgeIndices: edgeIndices, tileIndex: tileIndex)
+        let colors: [SIMD4<Float>] = []
+        
+        super.init(device: device, vertices: vertices, faceIndices: indices, edgeIndices: edgeIndices, tileIndex: tileIndex, colors: colors)
     }
 }

@@ -7,16 +7,22 @@
 
 import Foundation
 import MetalKit
+import Combine
 
 let sizes: [Int] = [12, 42, 162, 642, 2562]
 
 class Orchestrator {
     var renderControl: RenderControl
+    var mesh: Mesh!
     
-    let elevation: Elevation    
+    private var cancellables: Set<AnyCancellable> = []
     
-    init(renderControl: RenderControl, device: MTLDevice) {
+    let elevation: Elevation
+    
+    init(renderControl: RenderControl, device: MTLDevice, mesh: Mesh) {
         self.renderControl = renderControl
         self.elevation = Elevation(device: device)
+        self.mesh = mesh
+        
     }
 }

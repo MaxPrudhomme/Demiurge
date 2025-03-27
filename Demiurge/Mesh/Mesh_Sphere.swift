@@ -12,7 +12,8 @@ class Mesh_Sphere: Mesh {
         var vertices: [Vertex]
         var faceIndices: [[UInt32]] = []
         var edgeIndices: [[UInt32]] = []
-        var tileIndex: [[[Int]]] = []
+        var tileIndex: [Int] = []
+        var colors: [SIMD4<Float>] = []
         
         let originalVertices = Mesh_Sphere.createIcosahedronVertices(radius: radius)
 
@@ -22,13 +23,13 @@ class Mesh_Sphere: Mesh {
             radius: radius
         )
         
-        (vertices, faceIndices, edgeIndices, tileIndex) = Mesh_Sphere.createDoubleMesh(
+        (vertices, faceIndices, edgeIndices, colors, tileIndex) = Mesh_Sphere.createDoubleMesh(
             originalVertices: vertices,
             indices: faceIndices,
             edgeIndices: edgeIndices
         )
         
-        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex)
+        super.init(device: device, vertices: vertices, faceIndices: faceIndices.flatMap { $0 }, edgeIndices: edgeIndices.flatMap { $0 }, tileIndex: tileIndex, colors: colors)
     }
     
     private static func createIcosahedronVertices(radius: Float) -> [Vertex] {
@@ -152,11 +153,12 @@ class Mesh_Sphere: Mesh {
         }
     }
     
-    private static func addVertexIfNotProcessed(_ vertex: Vertex, in vertices: inout [Vertex]) -> Int {
+    private static func addVertexIfNotProcessed(_ vertex: Vertex, in vertices: inout [Vertex], color: SIMD4<Float>, colors: inout [SIMD4<Float>]) -> Int {
         if let existingIndex = vertices.firstIndex(where: { $0.position == vertex.position }) {
             return existingIndex
         } else {
             vertices.append(vertex)
+            colors.append(color)
             return vertices.count - 1
         }
     }
@@ -179,11 +181,12 @@ class Mesh_Sphere: Mesh {
         )
     }
     
-    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]], [[[Int]]]) {
+    private static func createDoubleMesh(originalVertices: [Vertex], indices: [[UInt32]], edgeIndices: [[UInt32]]) -> ([Vertex], [[UInt32]], [[UInt32]], [SIMD4<Float>], [Int]) {
         var newVertices: [Vertex] = []
         var newFaceIndices: [[UInt32]] = []
         var newEdgeIndices: [[UInt32]] = []
-        var tileIndex: [[[Int]]] = []
+        var newColors: [SIMD4<Float>] = []
+        var tileIndex: [Int] = []
         
         var midpoints: [String : Vertex] = [:]
         
@@ -206,9 +209,7 @@ class Mesh_Sphere: Mesh {
             
             let associatedMidpoints: [Vertex] = associatedFaces.map { midpoints["face_\(indices[$0])"]! }
             
-            let faceMidpointIndex = addVertexIfNotProcessed(getFaceMidpoint(associatedMidpoints), in: &newVertices)
-            
-            var tileIndexes: [[Int]] = []
+            let faceMidpointIndex = addVertexIfNotProcessed(getFaceMidpoint(associatedMidpoints), in: &newVertices, color: SIMD4<Float>(0.0, 0.0, 1.0, 1.0), colors: &newColors)
             
             // Process all pairs of adjacent faces around this vertex
             for i in 0..<associatedFaces.count {
@@ -234,12 +235,8 @@ class Mesh_Sphere: Mesh {
                         let midpoint2 = midpoints["face_\(face2)"]!
                         
                         // Add midpoints to vertices array if not already there
-                        let midpoint1Index = addVertexIfNotProcessed(midpoint1, in: &newVertices)
-                        let midpoint2Index = addVertexIfNotProcessed(midpoint2, in: &newVertices)
-                        
-                        newVertices[faceMidpointIndex].color = SIMD4<Float>(Float.random(in: 0...1), Float.random(in: 0...1), Float.random(in: 0...1), 1)
-                        
-                        tileIndexes.append([faceMidpointIndex, midpoint1Index, midpoint2Index])
+                        let midpoint1Index = addVertexIfNotProcessed(midpoint1, in: &newVertices, color: SIMD4<Float>(0.0, 0.0, 1.0, 1.0), colors: &newColors)
+                        let midpoint2Index = addVertexIfNotProcessed(midpoint2, in: &newVertices, color: SIMD4<Float>(0.0, 0.0, 1.0, 1.0), colors: &newColors)
                         
                         // Add edge between these midpoints
                         newEdgeIndices.append([UInt32(midpoint1Index), UInt32(midpoint2Index)])
@@ -247,9 +244,9 @@ class Mesh_Sphere: Mesh {
                     }
                 }
             }
-            tileIndex.append(tileIndexes)
+            tileIndex.append(faceMidpointIndex)
         }
         
-        return (newVertices, newFaceIndices, newEdgeIndices, tileIndex)
+        return (newVertices, newFaceIndices, newEdgeIndices, newColors, tileIndex)
     }
 }

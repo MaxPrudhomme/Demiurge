@@ -57,8 +57,6 @@ class Renderer: NSObject, MTKViewDelegate {
     var scalingVelocity: Float = 0.0
     var rotationSpeed: Float = 0.0025
 
-    var colorBuffer: MTLBuffer?
-
     init(renderControl: RenderControl) {
         self.renderControl = renderControl
         self.subdivisions = renderControl.subdivisions
@@ -73,7 +71,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         mesh = Mesh_Sphere(device: device, subdivisions: subdivisions)
 
-        orchestrator = Orchestrator(renderControl: renderControl, device: device)
+        orchestrator = Orchestrator(renderControl: renderControl, device: device, mesh: mesh)
         
         setupDepthStencilStates()
         setupPipeline()
@@ -218,11 +216,6 @@ class Renderer: NSObject, MTKViewDelegate {
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.attributes[0].bufferIndex = 0
 
-        // Vertex color
-        vertexDescriptor.attributes[1].format = .float4
-        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
-        vertexDescriptor.attributes[1].bufferIndex = 0
-        
         // Layout: stride matches the full Vertex struct
         vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
         vertexDescriptor.layouts[0].stepFunction = .perVertex
@@ -315,15 +308,16 @@ class Renderer: NSObject, MTKViewDelegate {
         commandEncoder.setRenderPipelineState(pipelineState)
         commandEncoder.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
         commandEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-
-        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
+        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)
+        commandEncoder.setVertexBuffer(mesh.colorBuffer, offset: 0, index: 3)
+        
         commandEncoder.drawIndexedPrimitives(type: .triangle, indexCount: mesh.faceIndexCount, indexType: .uint32, indexBuffer: mesh.faceIndexBuffer, indexBufferOffset: 0)
 
         // Draw edges
         commandEncoder.setDepthStencilState(edgeDepthStencilState)
         commandEncoder.setRenderPipelineState(edgePipelineState)
         commandEncoder.setCullMode(.back)
-        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)  // Add this line
+        commandEncoder.setVertexBuffer(pointSizeBuffer, offset: 0, index: 2)
         commandEncoder.drawIndexedPrimitives(type: .line, indexCount: mesh.edgeIndexCount, indexType: .uint32, indexBuffer: mesh.edgeIndexBuffer, indexBufferOffset: 0)
 
         if showVertices {

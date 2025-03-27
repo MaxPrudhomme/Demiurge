@@ -9,7 +9,6 @@ import MetalKit
 
 struct Vertex {
     var position: SIMD3<Float>
-    var color: SIMD4<Float> = SIMD4<Float>(0, 0, 0, 0)
 }
 
 class Mesh: ObservableObject {
@@ -19,13 +18,15 @@ class Mesh: ObservableObject {
     var faceIndexBuffer: MTLBuffer
     let faceIndexCount: Int
     
-    @Published var tileIndex: [[[Int]]]
+    @Published var tileIndex: [Int]
     let tileCount: Int
     
     var edgeIndexBuffer: MTLBuffer
     let edgeIndexCount: Int
     
-    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32], tileIndex: [[[Int]]]) {
+    var colorBuffer: MTLBuffer
+    
+    init(device: MTLDevice, vertices: [Vertex], faceIndices: [UInt32], edgeIndices: [UInt32], tileIndex: [Int], colors: [SIMD4<Float>]) {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: [])!
         vertexCount = vertices.count
         
@@ -37,6 +38,13 @@ class Mesh: ObservableObject {
         
         edgeIndexBuffer = device.makeBuffer(bytes: edgeIndices, length: edgeIndices.count * MemoryLayout<UInt32>.stride, options: [])!
         edgeIndexCount = edgeIndices.count
+        
+        colorBuffer = device.makeBuffer(bytes: colors, length: colors.count * MemoryLayout<SIMD4<Float>>.stride, options:[])!
+    }
+    
+    func setColor(forVertexIndex index: Int, color: SIMD4<Float>) {
+        let colorPointer = colorBuffer.contents().assumingMemoryBound(to: SIMD4<Float>.self)
+        colorPointer[index] = color
     }
 }
 

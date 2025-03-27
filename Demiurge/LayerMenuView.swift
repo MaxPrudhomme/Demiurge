@@ -16,6 +16,7 @@ struct LayerMenuButtonStyle: ButtonStyle {
 }
 
 struct LayerMenuView: View {
+    var renderControl: RenderControl
     @State private var bounce_layer = false
     @State private var layer: String = "All layers"
     
@@ -34,6 +35,9 @@ struct LayerMenuView: View {
                 Label("All layers", systemImage: "globe.americas")
                 .tag("All layers")
             }
+            .onChange(of: layer) { oldValue, newValue in
+                handleLayerChange(newValue)
+            }
         } label: {
             Image(systemName: "square.3.layers.3d.top.filled")
                 .font(.system(size: 24))
@@ -42,5 +46,21 @@ struct LayerMenuView: View {
         }
         .buttonStyle(LayerMenuButtonStyle())
         .padding(8)
+    }
+    
+    private func handleLayerChange(_ newValue: String) {
+        switch newValue {
+        case "Temperature":
+            break
+        case "Humidity":
+            break
+        case "Elevation":
+            break
+        case "All layers":
+            break
+            
+        default:
+            break
+        }
     }
 }

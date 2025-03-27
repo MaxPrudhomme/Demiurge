@@ -17,9 +17,4 @@ class RenderControl: ObservableObject {
     
     // Orchestrator Controller
     
-        // Elevation parameters
-        @Published var tectonicActivityFactor: Float = 1.0
-        @Published var volcanicActivityFactor: Float = 0.5
-        @Published var noiseFrequency: Float = 0.1
-        @Published var noiseAmplitude: Float = 1.0
 }

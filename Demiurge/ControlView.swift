@@ -53,7 +53,7 @@ struct ControlView: View {
             .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
 
             VStack { // Second Panel stack
-                LayerMenuView()
+                LayerMenuView(renderControl: renderControl)
             }
             .background(Material.regularMaterial)
             .cornerRadius(12)
