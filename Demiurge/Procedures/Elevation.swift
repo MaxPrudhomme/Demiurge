@@ -7,30 +7,47 @@
 
 import Foundation
 import simd
+import Combine
 
 class Elevation {
     var heightMap: [Float]
     let tileCount: Int
+    var renderControl: RenderControl
     private var noiseGenerator: SimplexNoise
 
     // Constants for elevation distribution
     private let seaLevel: Float = 0.0        // Zero is sea level
-    private let oceanRatio: Float = 0.65     // Percentage of planet that should be ocean
-    private let deepOceanLevel: Float = -0.7 // Lowest point in the ocean
-    private let highPeakLevel: Float = 0.8  // Highest mountain peaks
     private let deepOceanStartRatio: Float = 0.8 // Percentage into the ocean range where deep ocean starts
+    private var oceanRatio: Float = 0.65     // Percentage of planet that should be ocean
+    private var deepOceanLevel: Float = -0.8 // Lowest point in the ocean
+    private var highPeakLevel: Float = 0.8  // Highest mountain peaks1
 
     // New parameter to control the scale/frequency of continents
-    let continentScale: Float
+    var continentScale: Float = 2.5
 
-    init(tiles: Int, seed: Int = Int.random(in: 0..<10000), continentScale: Float = 2.5) {
+    init(tiles: Int, seed: Int = Int.random(in: 0..<10000), renderControl: RenderControl) {
         self.tileCount = tiles
         self.heightMap = [Float](repeating: 0, count: tiles)
         self.noiseGenerator = SimplexNoise(seed: seed)
-        self.continentScale = continentScale // Initialize the continent scale
+        self.renderControl = renderControl
+        
+        self.continentScale = renderControl.elevationController[0]
     }
-
+    
+    func regenerate() {
+        
+    }
+    
+    func modifyTerrain(newValues: [Float], mesh: Mesh) {
+        self.continentScale = newValues[0]
+        self.oceanRatio = newValues[1]
+        
+        generateElevation(from: mesh)
+    }
+    
     func generateElevation(from mesh: Mesh) {
+        let oceanWorld: Bool = oceanRatio >= 1.0
+        
         // Store tile center positions for later use
         var tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
 
@@ -84,7 +101,7 @@ class Elevation {
 
             var elevation: Float
 
-            if isLand {
+            if isLand && !oceanWorld{
                 // Land: Scale from sea level (0.0) up to mountain peaks (highPeakLevel)
 
                 // How far above threshold are we (0-1 range)

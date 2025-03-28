@@ -9,7 +9,7 @@ import SwiftUI
 
 class RenderControl: ObservableObject {
     // Renderer Controller
-    @Published var rotate: Bool = true
+    @Published var rotate: Bool = false
     @Published var rescale: Bool = false
     
     // Mesh Controller
@@ -17,4 +17,7 @@ class RenderControl: ObservableObject {
     
     // Orchestrator Controller
     @Published var layer: String = "All layers"
+    
+    // Continent Scale / Ocean Ratio / Variance
+    @Published var elevationController: [Float] = [2.5, 0.65, 1.0]
 }

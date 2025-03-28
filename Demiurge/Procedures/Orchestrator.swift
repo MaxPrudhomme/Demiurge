@@ -20,13 +20,21 @@ class Orchestrator {
     init(renderControl: RenderControl, device: MTLDevice, mesh: Mesh) {
         self.renderControl = renderControl
         self.mesh = mesh
-        self.elevation = Elevation(tiles: mesh.tileCount)
+        self.elevation = Elevation(tiles: mesh.tileCount, renderControl: renderControl)
         
         elevation.generateElevation(from: mesh)
         
         renderControl.$layer
             .sink { [weak self] newLayer in
                 self?.handleLayerChange(newLayer)
+            }
+            .store(in: &cancellables)
+        
+        renderControl.$elevationController
+            .sink { [weak self] newValues in
+                self?.elevation.modifyTerrain(newValues: newValues, mesh: mesh)
+                //Reusing handleLayerChange to trigger a reload of the map
+                self?.handleLayerChange(renderControl.layer)
             }
             .store(in: &cancellables)
     }
@@ -55,7 +63,7 @@ class Orchestrator {
     func showElevation() {
         let grayScaleMap: [SIMD4<Float>] = elevation.heightMap.map { height in
             // Convert from elevation range [-0.7, 0.8] to grayscale [0, 1]
-            let normalizedHeight = (height - (-0.7)) / (0.8 - (-0.7))
+            let normalizedHeight = (height - (-0.8)) / (0.8 - (-0.8))
             let greyValue = normalizedHeight.clamped(to: 0...1)
             return SIMD4<Float>(greyValue, greyValue, greyValue, 1.0) // RGBA format
         }

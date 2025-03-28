@@ -11,9 +11,12 @@ struct EditorView: View {
     var renderControl: RenderControl
     var planetName: String = "Planet K28-B"
     
-    @State private var startingOffset: CGFloat = UIScreen.main.bounds.height * 0.57
+    @State private var startingOffset: CGFloat = UIScreen.main.bounds.height * 0.59
     @State private var currentOffset: CGFloat = 0
     @State private var endOffset: CGFloat = 0
+    
+    @State private var bounce_books = false
+    @State private var bounce_hammer = false
     
     private let fullScreenThreshold: CGFloat = -150
     private let dismissThreshold: CGFloat = 150
@@ -34,32 +37,39 @@ struct EditorView: View {
                     
                     HStack {
                         Button(action: {
+                            bounce_books.toggle()
                         }, label: {
                             Image(systemName: "books.vertical")
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
-                                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating)
+                                .symbolEffect(.bounce.up.byLayer, value: bounce_books)
                                 
                         })
                         Spacer()
                         Text(planetName)
+                            .font(.title)
                         Spacer()
                         Button(action: {
+                            bounce_hammer.toggle()
                         }, label: {
                             Image(systemName: "hammer")
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
-                                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating)
+                                .symbolEffect(.bounce.up.byLayer, value: bounce_hammer)
                                 
                         })
                     }
                     .padding(.top, 16)
+                    .padding(.bottom, 32)
                     .padding(.horizontal, 32)
+                    
+                    EditorMenuView(renderControl: renderControl)
+
                     Spacer()
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height + geometry.safeAreaInsets.bottom + 200)
                 .background(Material.regularMaterial)
-                .cornerRadius(32, corners: [.topLeft, .topRight]) // Only round the top corners
+                .cornerRadius(32, corners: [.topLeft, .topRight])
                 .offset(y: startingOffset)
                 .offset(y: limitDragDistance(currentOffset))
                 .offset(y: endOffset)
