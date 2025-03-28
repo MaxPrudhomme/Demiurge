@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		ABC40C112D83216400F4B054 /* Demiurge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Demiurge.app; path = "/Users/maxprudhomme/Code/Demiurge/build/Debug-iphoneos/Demiurge.app"; sourceTree = "<absolute>"; };
+		ABBB6F712D96AB980061DE78 /* Demiurge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Demiurge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +33,7 @@
 			isa = PBXGroup;
 			children = (
 				ABC40C132D83216400F4B054 /* Demiurge */,
+				ABBB6F712D96AB980061DE78 /* Demiurge.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,7 +59,7 @@
 			packageProductDependencies = (
 			);
 			productName = Demiurge;
-			productReference = ABC40C112D83216400F4B054 /* Demiurge.app */;
+			productReference = ABBB6F712D96AB980061DE78 /* Demiurge.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

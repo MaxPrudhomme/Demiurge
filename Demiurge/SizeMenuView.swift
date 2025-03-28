@@ -19,7 +19,7 @@ struct SizeMenuButtonStyle: ButtonStyle {
 struct SizeMenuView: View {
     var renderControl: RenderControl
     @State private var bounce_hexagon = false
-    @State private var layer: Int = 5
+    @State private var layer: Int = 3
     
     var body: some View {
         Menu { // Picker is in a menu to avoid the value being shown when in .menu mode

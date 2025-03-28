@@ -20,13 +20,7 @@ struct ContentView: View {
                 
                 Spacer()
 
-                HStack {
-                    Spacer()
-                    Text("Navigation")
-                        .padding()
-                    Spacer()
-                }
-                .background(Color.gray.opacity(0.5))
+                EditorView(renderControl: renderControl)
             }
         }
     }
