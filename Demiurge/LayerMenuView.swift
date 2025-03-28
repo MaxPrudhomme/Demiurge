@@ -49,18 +49,6 @@ struct LayerMenuView: View {
     }
     
     private func handleLayerChange(_ newValue: String) {
-        switch newValue {
-        case "Temperature":
-            break
-        case "Humidity":
-            break
-        case "Elevation":
-            break
-        case "All layers":
-            break
-            
-        default:
-            break
-        }
+        renderControl.layer = newValue
     }
 }

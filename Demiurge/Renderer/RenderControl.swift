@@ -13,8 +13,8 @@ class RenderControl: ObservableObject {
     @Published var rescale: Bool = false
     
     // Mesh Controller
-    @Published var subdivisions: Int = 3
+    @Published var subdivisions: Int = 5
     
     // Orchestrator Controller
-    
+    @Published var layer: String = "All layers"
 }
