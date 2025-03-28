@@ -27,9 +27,10 @@ class Orchestrator {
         // Generate elevation before creating the color map
         elevation.generateElevation(from: mesh)
 
-        // Create a greyscale color map based on the updated height map values
         let grayScaleMap: [SIMD4<Float>] = elevation.heightMap.map { height in
-            let greyValue = height // height value between 0 and 1
+            // Convert from elevation range [-0.7, 0.8] to grayscale [0, 1]
+            let normalizedHeight = (height - (-0.7)) / (0.8 - (-0.7))
+            let greyValue = normalizedHeight.clamped(to: 0...1)
             return SIMD4<Float>(greyValue, greyValue, greyValue, 1.0) // RGBA format
         }
 

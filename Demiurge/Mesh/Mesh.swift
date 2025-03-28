@@ -70,7 +70,7 @@ class Mesh: ObservableObject {
             // Read vertices
             let vertexDataSize = Int(vertexCount) * MemoryLayout<Vertex>.stride
             var vertices = [Vertex](repeating: Vertex(position: SIMD3<Float>(0,0,0)), count: Int(vertexCount))
-            vertices.withUnsafeMutableBytes { destBuffer in
+            _ = vertices.withUnsafeMutableBytes { destBuffer in
                 data.withUnsafeBytes { sourceBuffer in
                     memcpy(destBuffer.baseAddress!,
                            sourceBuffer.baseAddress!.advanced(by: offset),
@@ -86,7 +86,7 @@ class Mesh: ObservableObject {
             // Read face indices
             let faceIndexDataSize = Int(faceIndexCount) * MemoryLayout<UInt32>.stride
             var faceIndices = [UInt32](repeating: 0, count: Int(faceIndexCount))
-            faceIndices.withUnsafeMutableBytes { destBuffer in
+            _ = faceIndices.withUnsafeMutableBytes { destBuffer in
                 data.withUnsafeBytes { sourceBuffer in
                     memcpy(destBuffer.baseAddress!,
                            sourceBuffer.baseAddress!.advanced(by: offset),
@@ -102,7 +102,7 @@ class Mesh: ObservableObject {
             // Read edge indices
             let edgeIndexDataSize = Int(edgeIndexCount) * MemoryLayout<UInt32>.stride
             var edgeIndices = [UInt32](repeating: 0, count: Int(edgeIndexCount))
-            edgeIndices.withUnsafeMutableBytes { destBuffer in
+            _ = edgeIndices.withUnsafeMutableBytes { destBuffer in
                 data.withUnsafeBytes { sourceBuffer in
                     memcpy(destBuffer.baseAddress!,
                            sourceBuffer.baseAddress!.advanced(by: offset),
@@ -118,7 +118,7 @@ class Mesh: ObservableObject {
             // Read tile indices
             let tileIndexDataSize = Int(tileIndexCount) * MemoryLayout<Int>.stride
             var tileIndices = [Int](repeating: 0, count: Int(tileIndexCount))
-            tileIndices.withUnsafeMutableBytes { destBuffer in
+            _ = tileIndices.withUnsafeMutableBytes { destBuffer in
                 data.withUnsafeBytes { sourceBuffer in
                     memcpy(destBuffer.baseAddress!,
                            sourceBuffer.baseAddress!.advanced(by: offset),
@@ -131,7 +131,7 @@ class Mesh: ObservableObject {
             let colorCount = (data.count - offset) / MemoryLayout<SIMD4<Float>>.stride
             var colors = [SIMD4<Float>](repeating: SIMD4<Float>(0,0,0,0), count: colorCount)
             let colorDataSize = colorCount * MemoryLayout<SIMD4<Float>>.stride
-            colors.withUnsafeMutableBytes { destBuffer in
+            _ = colors.withUnsafeMutableBytes { destBuffer in
                 data.withUnsafeBytes { sourceBuffer in
                     memcpy(destBuffer.baseAddress!,
                            sourceBuffer.baseAddress!.advanced(by: offset),
