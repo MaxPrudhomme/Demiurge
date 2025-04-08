@@ -77,8 +77,130 @@ class Orchestrator {
     }
     
     func showAllLayers() {
-        // TEMP: will be changed later on.
-        showHumidity()
+        let elevationMap = elevation.heightMap
+        let temperatureMap = temperature.temperatureMap
+        let humidityMap = humidity.humidityMap
+
+        var biomeMap: [SIMD4<Float>] = []
+        var biomeCounts: [String: Int] = [
+            "Deep Ocean": 0, "Ocean": 0, "Shallows": 0, "Land": 0, "Hills": 0,
+            "Mountains": 0, "Peaks": 0, "Frozen Wasteland": 0, "Tundra": 0,
+            "Boreal Forest": 0, "Temperate Forest": 0, "Grassland": 0, "Desert": 0,
+            "Tropical Rainforest": 0
+        ]
+
+        let deepOceanLevel: Float = -0.6 // Assuming this value, adjust if needed
+
+        for i in 0..<mesh.tileCount {
+            let h = elevationMap[i]
+            let temp = temperatureMap[i]
+            let humidity = humidityMap[i]
+
+            var biome: String = "Ocean"
+            var baseColor: SIMD4<Float> = SIMD4<Float>(0.0, 0.3, 0.8, 1.0) // Default to ocean
+            var brightness: Float = 1.0
+
+            if h < deepOceanLevel + 0.1 {
+                biome = "Deep Ocean"
+                baseColor = SIMD4<Float>(0.0, 0.2, 0.6, 1.0)
+                // Darker with depth
+                let depthFactor = 1.0 - ((h - (deepOceanLevel + 0.1)) / (deepOceanLevel - (deepOceanLevel + 0.1)))
+                brightness = 0.5 + 0.5 * depthFactor.clamped(to: 0...1) // Range from 0.5 to 1.0
+            } else if h < -0.1 {
+                biome = "Ocean"
+                baseColor = SIMD4<Float>(0.0, 0.3, 0.8, 1.0)
+                // Slightly darker with depth
+                let depthFactor = 1.0 - ((h - (-0.1)) / (deepOceanLevel + 0.1 - (-0.1)))
+                brightness = 0.7 + 0.3 * depthFactor.clamped(to: 0...1) // Range from 0.7 to 1.0
+            } else if h < 0.0 {
+                biome = "Shallows"
+                baseColor = SIMD4<Float>(0.2, 0.4, 0.7, 1.0)
+                // Lighter as it gets shallower
+                brightness = 0.8 + 0.2 * (h / 0.1).clamped(to: 0...1) // Range from 0.8 to 1.0
+            } else if h < 0.2 {
+                biome = "Land"
+                if temp < 0.1 {
+                    biome = "Frozen Wasteland"
+                    baseColor = SIMD4<Float>(0.9, 0.9, 0.9, 1.0)
+                } else if temp < 0.3 {
+                    biome = "Tundra"
+                    baseColor = SIMD4<Float>(0.8, 0.8, 0.8, 1.0)
+                } else if temp < 0.6 {
+                    if humidity < 0.5 {
+                        biome = "Grassland"
+                        baseColor = SIMD4<Float>(0.7, 0.8, 0.3, 1.0)
+                    } else {
+                        biome = "Temperate Forest"
+                        baseColor = SIMD4<Float>(0.2, 0.6, 0.2, 1.0)
+                    }
+                } else if temp < 0.8 {
+                    if humidity < 0.5 {
+                        biome = "Desert"
+                        baseColor = SIMD4<Float>(0.9, 0.8, 0.4, 1.0)
+                    } else {
+                        biome = "Tropical Rainforest"
+                        baseColor = SIMD4<Float>(0.1, 0.7, 0.3, 1.0)
+                    }
+                } else { // Hot
+                    if humidity < 0.6 {
+                        biome = "Desert"
+                        baseColor = SIMD4<Float>(0.9, 0.7, 0.2, 1.0)
+                    } else {
+                        biome = "Tropical Rainforest"
+                        baseColor = SIMD4<Float>(0.1, 0.5, 0.2, 1.0)
+                    }
+                }
+                // Lighter with height in "Land"
+                brightness = 0.8 + 0.2 * (h / 0.2).clamped(to: 0...1)
+            } else if h < 0.4 {
+                biome = "Hills"
+                if temp < 0.3 {
+                    biome = "Boreal Forest"
+                    baseColor = SIMD4<Float>(0.3, 0.5, 0.3, 1.0)
+                } else if temp < 0.6 {
+                    if humidity < 0.6 {
+                        biome = "Grassland"
+                        baseColor = SIMD4<Float>(0.6, 0.7, 0.3, 1.0)
+                    } else {
+                        biome = "Temperate Forest"
+                        baseColor = SIMD4<Float>(0.2, 0.5, 0.2, 1.0)
+                    }
+                } else {
+                    if humidity < 0.5 {
+                        biome = "Grassland"
+                        baseColor = SIMD4<Float>(0.8, 0.7, 0.4, 1.0)
+                    } else {
+                        baseColor = SIMD4<Float>(0.3, 0.4, 0.2, 1.0)
+                    }
+                }
+                // Lighter with height in "Hills"
+                brightness = 0.7 + 0.3 * ((h - 0.2) / 0.2).clamped(to: 0...1)
+            } else if h < 0.7 {
+                biome = "Mountains"
+                baseColor = SIMD4<Float>(0.6, 0.6, 0.6, 1.0)
+                if temp < 0.3 {
+                    biome = "Tundra"
+                    baseColor = SIMD4<Float>(0.7, 0.7, 0.7, 1.0)
+                }
+                // Lighter with height in "Mountains"
+                brightness = 0.6 + 0.4 * ((h - 0.4) / 0.3).clamped(to: 0...1)
+            } else {
+                biome = "Peaks"
+                baseColor = SIMD4<Float>(0.8, 0.8, 0.8, 1.0)
+                if temp < 0.1 {
+                    baseColor = SIMD4<Float>(1.0, 1.0, 1.0, 1.0) // Snow
+                }
+                // Always bright for peaks
+                brightness = 1.0
+            }
+
+            let finalColor = baseColor * brightness
+            biomeMap.append(SIMD4<Float>(finalColor.x, finalColor.y, finalColor.z, 1.0))
+            biomeCounts[biome] = (biomeCounts[biome] ?? 0) + 1
+        }
+
+        print("Biome Counts: \(biomeCounts)")
+        changeColorMap(map: biomeMap)
     }
     
     func showElevation() {
