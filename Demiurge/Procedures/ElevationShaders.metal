@@ -164,30 +164,53 @@ kernel void smoothValues(device const float* inputValues [[buffer(0)]],
                          device const float3* positions [[buffer(2)]],
                          constant float& radius [[buffer(3)]],
                          constant uint& tileCount [[buffer(4)]],
-                         uint id [[thread_position_in_grid]]) {
+                         uint id [[thread_position_in_grid]],
+                         threadgroup float* sharedPositions [[threadgroup(0)]],
+                         threadgroup float* sharedValues [[threadgroup(1)]],
+                         uint tid [[thread_index_in_threadgroup]],
+                         uint threadsPerGroup [[threads_per_threadgroup]]) {
     if (id >= tileCount) return;
     
     float3 pos = positions[id];
     float totalWeight = 1.0;
     float weightedSum = inputValues[id];
     
-    // Sample subset to avoid O(n²)
-    int sampleStep = max(1, int(tileCount) / 200);
-    
-    for (uint j = 0; j < tileCount; j += sampleStep) {
-        if (j != id) {
-            float dist = length(pos - positions[j]);
-            if (dist < radius) {
-                float weight = 1.0 - (dist / radius);
-                weightedSum += inputValues[j] * weight;
-                totalWeight += weight;
+    // Process in chunks using threadgroup memory for faster access
+    for (uint groupStart = 0; groupStart < tileCount; groupStart += threadsPerGroup) {
+        // Load chunk into shared memory
+        uint loadIndex = groupStart + tid;
+        if (loadIndex < tileCount) {
+            sharedPositions[tid * 3] = positions[loadIndex].x;
+            sharedPositions[tid * 3 + 1] = positions[loadIndex].y;
+            sharedPositions[tid * 3 + 2] = positions[loadIndex].z;
+            sharedValues[tid] = inputValues[loadIndex];
+        }
+        
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        
+        // Process this chunk
+        for (uint j = 0; j < min(threadsPerGroup, tileCount - groupStart); j++) {
+            uint neighborIdx = groupStart + j;
+            if (neighborIdx != id) {
+                float3 neighborPos = float3(
+                    sharedPositions[j * 3],
+                    sharedPositions[j * 3 + 1],
+                    sharedPositions[j * 3 + 2]
+                );
+                float dist = length(pos - neighborPos);
+                if (dist < radius) {
+                    float weight = 1.0 - (dist / radius);
+                    weightedSum += sharedValues[j] * weight;
+                    totalWeight += weight;
+                }
             }
         }
+        
+        threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     
     outputValues[id] = weightedSum / totalWeight;
 }
-
 // Complete elevation generation kernel that mimics the CPU version
 kernel void generateElevation(device const float3* positions [[buffer(0)]],
                              device const float* continentMask [[buffer(1)]],

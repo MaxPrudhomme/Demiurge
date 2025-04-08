@@ -12,58 +12,63 @@ import Metal
 
 class Elevation {
     var heightMap: [Float]
-    let tileCount: Int
-    var renderControl: RenderControl
-    private var noiseGenerator: SimplexNoise
+        let tileCount: Int
+        var renderControl: RenderControl
+        private var noiseGenerator: SimplexNoise
 
-    // Metal properties
-    private var metalDevice: MTLDevice!
-    private var commandQueue: MTLCommandQueue!
-    private var continentMaskPipeline: MTLComputePipelineState!
-    private var smoothingPipeline: MTLComputePipelineState!
-    private var elevationPipeline: MTLComputePipelineState!
-    private var permTableBuffer: MTLBuffer!
+        // Metal properties
+        private var metalDevice: MTLDevice!
+        private var commandQueue: MTLCommandQueue!
+        private var continentMaskPipeline: MTLComputePipelineState!
+        private var smoothingPipeline: MTLComputePipelineState!
+        private var elevationPipeline: MTLComputePipelineState!
+        private var permTableBuffer: MTLBuffer!
 
-    // Cached position buffer for reuse
-    private var positionsBuffer: MTLBuffer?
-    private var tilePositions: [SIMD3<Float>]?
+        // Persistent buffers for better performance
+        private var positionsBuffer: MTLBuffer?
+        private var tilePositions: [SIMD3<Float>]?
+        private var continentMaskBuffer: MTLBuffer?
+        private var smoothBuffer1: MTLBuffer?
+        private var smoothBuffer2: MTLBuffer?
+        private var elevationBuffer: MTLBuffer?
+        private var finalSmoothBuffer: MTLBuffer?
 
-    // Constants for elevation distribution
-    private var seaLevel: Float = 0.0        // Zero is sea level
-    private var deepOceanStartRatio: Float = 0.8 // Percentage into the ocean range where deep ocean starts
-    private var oceanRatio: Float = 0.65         // Percentage of planet that should be ocean
-    private var deepOceanLevel: Float = -0.8 // Lowest point in the ocean
-    private var highPeakLevel: Float = 0.8    // Highest mountain peaks1
+        // Constants for elevation distribution
+        private var seaLevel: Float = 0.0        // Zero is sea level
+        private var deepOceanStartRatio: Float = 0.8 // Percentage into the ocean range where deep ocean starts
+        private var oceanRatio: Float = 0.65         // Percentage of planet that should be ocean
+        private var deepOceanLevel: Float = -0.8 // Lowest point in the ocean
+        private var highPeakLevel: Float = 0.8    // Highest mountain peaks1
 
-    // New parameter to control the scale/frequency of continents
-    var continentScale: Float = 2.5
+        // New parameter to control the scale/frequency of continents
+        var continentScale: Float = 2.5
 
-    init(tiles: Int, seed: Int = Int.random(in: 0..<10000), renderControl: RenderControl) {
-        self.tileCount = tiles
-        self.heightMap = [Float](repeating: 0, count: tiles)
-        self.noiseGenerator = SimplexNoise(seed: seed)
-        self.renderControl = renderControl
-        self.continentScale = renderControl.elevationController[0]
-        self.tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tiles)
+        init(tiles: Int, seed: Int = Int.random(in: 0..<10000), renderControl: RenderControl) {
+            self.tileCount = tiles
+            self.heightMap = [Float](repeating: 0, count: tiles)
+            self.noiseGenerator = SimplexNoise(seed: seed)
+            self.renderControl = renderControl
+            self.continentScale = renderControl.elevationController[0]
+            self.tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tiles)
 
-        setupMetal(seed: seed)
-    }
-
-    private func setupMetal(seed: Int) {
-        // Get the default Metal device
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            fatalError("Metal is not supported on this device")
+            setupMetal(seed: seed)
         }
-        self.metalDevice = device
 
-        // Create a command queue
-        guard let queue = device.makeCommandQueue() else {
-            fatalError("Could not create Metal command queue")
-        }
-        self.commandQueue = queue
+        private func setupMetal(seed: Int) {
+            // Get the default Metal device
+            guard let device = MTLCreateSystemDefaultDevice() else {
+                fatalError("Metal is not supported on this device")
+            }
+            self.metalDevice = device
 
-        // Create permutation table buffer for noise generation
-        var permArray = [Int](repeating: 0, count: 512)
+            // Create a command queue
+            guard let queue = device.makeCommandQueue() else {
+                fatalError("Could not create Metal command queue")
+            }
+            self.commandQueue = queue
+
+            // Create permutation table buffer for noise generation
+            var permArray = [Int](repeating: 0, count: 512)
             srand48(seed)
 
             // Generate the same permutation table as the CPU version
@@ -83,208 +88,208 @@ class Elevation {
                                                     length: MemoryLayout<Int>.stride * permArray.count,
                                                     options: [])
 
-        // Load the Metal library
-        guard let library = device.makeDefaultLibrary() else {
-            fatalError("Could not load default Metal library")
-        }
-
-        // Create the compute pipelines
-        do {
-            let continentMaskFunction = library.makeFunction(name: "generateContinentMask")!
-            self.continentMaskPipeline = try device.makeComputePipelineState(function: continentMaskFunction)
-
-            let smoothingFunction = library.makeFunction(name: "smoothValues")!
-            self.smoothingPipeline = try device.makeComputePipelineState(function: smoothingFunction)
-
-            let elevationFunction = library.makeFunction(name: "generateElevation")!
-            self.elevationPipeline = try device.makeComputePipelineState(function: elevationFunction)
-        } catch {
-            fatalError("Failed to create compute pipeline: \(error)")
-        }
-    }
-
-    func regenerate() {
-        // Reset cached data if needed
-        self.positionsBuffer = nil
-        self.tilePositions = nil
-    }
-
-    func modifyTerrain(newValues: [Float], mesh: Mesh) {
-        self.continentScale = newValues[0]
-        self.oceanRatio = newValues[1]
-
-        generateElevationGPU(from: mesh)
-    }
-
-    func generateElevationGPU(from mesh: Mesh) {
-        print("!!! Running ON GPU !!!")
-
-        var oceanWorld: Bool = oceanRatio >= 1.0
-
-        // Always recalculate tile positions
-        tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
-
-        for i in 0..<tileCount {
-            let centerVertex = mesh.getVertex(forVertexIndex: mesh.tileIndex[i])
-            print("Raw Vertex Position (\(i)): \(centerVertex.position)") // Keep this for debugging
-            let normalizedPosition = centerVertex.position.normalized()
-            print("Normalized Position (\(i)): \(normalizedPosition)") // Keep this for debugging
-            tilePositions![i] = normalizedPosition
-        }
-
-        // Create or update the positions buffer
-        if positionsBuffer == nil {
-            positionsBuffer = metalDevice.makeBuffer(bytes: tilePositions!,
-                                                    length: MemoryLayout<SIMD3<Float>>.stride * tileCount,
-                                                    options: [])
-        } else {
-            // Update the existing buffer with new data
-            positionsBuffer?.contents().copyMemory(from: tilePositions!, byteCount: MemoryLayout<SIMD3<Float>>.stride * tileCount)
-        }
-
-        // Create buffers for each step
-        let continentMaskBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
-        let smoothBuffer1 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
-        let smoothBuffer2 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
-        let elevationBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
-        let finalSmoothBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
-
-        // Create an autorelease pool for temporary Metal objects
-        autoreleasepool {
-            // STEP 1: Generate continent mask
-            let maskCommandBuffer = commandQueue.makeCommandBuffer()!
-            let maskEncoder = maskCommandBuffer.makeComputeCommandEncoder()!
-
-            maskEncoder.setComputePipelineState(continentMaskPipeline)
-            maskEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
-            maskEncoder.setBuffer(continentMaskBuffer, offset: 0, index: 1)
-            maskEncoder.setBuffer(permTableBuffer, offset: 0, index: 2)
-            var scale = continentScale
-            maskEncoder.setBytes(&scale, length: MemoryLayout<Float>.size, index: 3)
-            var count = UInt32(tileCount)
-            maskEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
-
-            let threadsPerGrid = MTLSizeMake(tileCount, 1, 1)
-            let threadsPerThreadgroup = MTLSizeMake(min(continentMaskPipeline.maxTotalThreadsPerThreadgroup, tileCount), 1, 1)
-            maskEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
-            maskEncoder.endEncoding()
-
-            maskCommandBuffer.commit()
-            maskCommandBuffer.waitUntilCompleted()
-
-            // DEBUG: Read and print continent mask values
-            var continentMaskValues = [Float](repeating: 0, count: min(10, tileCount))
-            let continentMaskPtr = continentMaskBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
-            for i in 0..<min(10, tileCount) {
-                continentMaskValues[i] = continentMaskPtr[i]
-            }
-            print("Continent Mask (first \(continentMaskValues.count) values): \(continentMaskValues)")
-
-            // STEP 2: Apply smoothing iterations to continent mask
-            var inputBuffer = continentMaskBuffer
-            var outputBuffer = smoothBuffer1
-
-            for i in 0..<3 {
-                let smoothCommandBuffer = commandQueue.makeCommandBuffer()! // Create a new command buffer for each smoothing pass for easier debugging
-                let smoothEncoder = smoothCommandBuffer.makeComputeCommandEncoder()!
-
-                smoothEncoder.setComputePipelineState(smoothingPipeline)
-                smoothEncoder.setBuffer(inputBuffer, offset: 0, index: 0)
-                smoothEncoder.setBuffer(outputBuffer, offset: 0, index: 1)
-                smoothEncoder.setBuffer(positionsBuffer, offset: 0, index: 2)
-                var radius: Float = 0.2
-                smoothEncoder.setBytes(&radius, length: MemoryLayout<Float>.size, index: 3)
-                smoothEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
-
-                smoothEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
-                smoothEncoder.endEncoding()
-
-                smoothCommandBuffer.commit()
-                smoothCommandBuffer.waitUntilCompleted()
-
-                // Swap buffers for next iteration
-                let temp = inputBuffer
-                inputBuffer = outputBuffer
-                outputBuffer = (i == 1) ? smoothBuffer2 : temp
+            // Load the Metal library
+            guard let library = device.makeDefaultLibrary() else {
+                fatalError("Could not load default Metal library")
             }
 
-            // Calculate ocean threshold from smoothed continent mask
-            var continentMaskFinal = [Float](repeating: 0, count: tileCount)
-            let finalMaskPtr = inputBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+            // Create the compute pipelines
+            do {
+                let continentMaskFunction = library.makeFunction(name: "generateContinentMask")!
+                self.continentMaskPipeline = try device.makeComputePipelineState(function: continentMaskFunction)
+
+                let smoothingFunction = library.makeFunction(name: "smoothValues")!
+                self.smoothingPipeline = try device.makeComputePipelineState(function: smoothingFunction)
+
+                let elevationFunction = library.makeFunction(name: "generateElevation")!
+                self.elevationPipeline = try device.makeComputePipelineState(function: elevationFunction)
+            } catch {
+                fatalError("Failed to create compute pipeline: \(error)")
+            }
+            
+            // Create persistent buffers
+            createPersistentBuffers()
+        }
+        
+        private func createPersistentBuffers() {
+            // Create buffers only once for reuse
+            if continentMaskBuffer == nil {
+                continentMaskBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])
+            }
+            
+            if smoothBuffer1 == nil {
+                smoothBuffer1 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])
+            }
+            
+            if smoothBuffer2 == nil {
+                smoothBuffer2 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])
+            }
+            
+            if elevationBuffer == nil {
+                elevationBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])
+            }
+            
+            if finalSmoothBuffer == nil {
+                finalSmoothBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])
+            }
+        }
+
+        func modifyTerrain(newValues: [Float], mesh: Mesh) {
+            self.continentScale = newValues[0]
+            self.oceanRatio = newValues[1]
+
+            generateElevationGPU(from: mesh)
+        }
+
+        func generateElevationGPU(from mesh: Mesh) {
+            var oceanWorld: Bool = oceanRatio >= 1.0
+
+            // Always recalculate tile positions
+            tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
+
             for i in 0..<tileCount {
-                continentMaskFinal[i] = finalMaskPtr[i]
+                let centerVertex = mesh.getVertex(forVertexIndex: mesh.tileIndex[i])
+                let normalizedPosition = centerVertex.position.normalized()
+                tilePositions![i] = normalizedPosition
             }
 
-            let sortedElevations = continentMaskFinal.sorted()
-            let thresholdIndex = Int(Float(tileCount) * oceanRatio)
-            var oceanThreshold = thresholdIndex < sortedElevations.count ? sortedElevations[thresholdIndex] : 0.5
-            print("Ocean Threshold: \(oceanThreshold)")
-
-            // STEP 3: Final elevation generation
-            let elevationCommandBuffer = commandQueue.makeCommandBuffer()!
-            let elevEncoder = elevationCommandBuffer.makeComputeCommandEncoder()!
-
-            elevEncoder.setComputePipelineState(elevationPipeline)
-            elevEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
-            elevEncoder.setBuffer(inputBuffer, offset: 0, index: 1) // Final smoothed continent mask
-            elevEncoder.setBuffer(elevationBuffer, offset: 0, index: 2)
-            elevEncoder.setBuffer(permTableBuffer, offset: 0, index: 3)
-
-            elevEncoder.setBytes(&oceanThreshold, length: MemoryLayout<Float>.size, index: 4)
-            elevEncoder.setBytes(&seaLevel, length: MemoryLayout<Float>.size, index: 5)
-            elevEncoder.setBytes(&highPeakLevel, length: MemoryLayout<Float>.size, index: 6)
-            elevEncoder.setBytes(&deepOceanLevel, length: MemoryLayout<Float>.size, index: 7)
-            elevEncoder.setBytes(&deepOceanStartRatio, length: MemoryLayout<Float>.size, index: 8)
-            elevEncoder.setBytes(&oceanWorld, length: MemoryLayout<Bool>.size, index: 9)
-            elevEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 10)
-
-            elevEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
-            elevEncoder.endEncoding()
-
-            elevationCommandBuffer.commit()
-            elevationCommandBuffer.waitUntilCompleted()
-
-            // DEBUG: Read and print elevation buffer values
-            var elevationValues = [Float](repeating: 0, count: min(10, tileCount))
-            let elevationPtr = elevationBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
-            for i in 0..<min(10, tileCount) {
-                elevationValues[i] = elevationPtr[i]
+            // Create or update the positions buffer
+            if positionsBuffer == nil {
+                positionsBuffer = metalDevice.makeBuffer(bytes: tilePositions!,
+                                                        length: MemoryLayout<SIMD3<Float>>.stride * tileCount,
+                                                        options: [])
+            } else {
+                // Update the existing buffer with new data
+                positionsBuffer?.contents().copyMemory(from: tilePositions!, byteCount: MemoryLayout<SIMD3<Float>>.stride * tileCount)
             }
-            print("Elevation Buffer (first \(elevationValues.count) values): \(elevationValues)")
+            
+            createPersistentBuffers()
 
-            // Apply final smoothing
-            let finalSmoothCommandBuffer = commandQueue.makeCommandBuffer()!
-            let smoothEncoderFinal = finalSmoothCommandBuffer.makeComputeCommandEncoder()!
+            // Create an autorelease pool for temporary Metal objects
+            autoreleasepool {
+                // Create a single command buffer for all operations
+                let commandBuffer = commandQueue.makeCommandBuffer()!
+                
+                // STEP 1: Generate continent mask
+                let maskEncoder = commandBuffer.makeComputeCommandEncoder()!
+                maskEncoder.setComputePipelineState(continentMaskPipeline)
+                maskEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
+                maskEncoder.setBuffer(continentMaskBuffer, offset: 0, index: 1)
+                maskEncoder.setBuffer(permTableBuffer, offset: 0, index: 2)
+                var scale = continentScale
+                maskEncoder.setBytes(&scale, length: MemoryLayout<Float>.size, index: 3)
+                var count = UInt32(tileCount)
+                maskEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
 
-            smoothEncoderFinal.setComputePipelineState(smoothingPipeline)
-            smoothEncoderFinal.setBuffer(elevationBuffer, offset: 0, index: 0)
-            smoothEncoderFinal.setBuffer(finalSmoothBuffer, offset: 0, index: 1)
-            smoothEncoderFinal.setBuffer(positionsBuffer, offset: 0, index: 2)
-            var finalRadius: Float = 0.05
-            smoothEncoderFinal.setBytes(&finalRadius, length: MemoryLayout<Float>.size, index: 3)
-            smoothEncoderFinal.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
-
-            smoothEncoderFinal.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
-            smoothEncoderFinal.endEncoding()
-
-            finalSmoothCommandBuffer.commit()
-            finalSmoothCommandBuffer.waitUntilCompleted()
-
-            // DEBUG: Read and print final smoothed elevation values
-            var finalElevationValues = [Float](repeating: 0, count: min(10, tileCount))
-            let finalElevationPtr = finalSmoothBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
-            for i in 0..<tileCount {
-                heightMap[i] = finalElevationPtr[i]
-                if i < 10 {
-                    finalElevationValues[i] = heightMap[i]
+                let threadsPerGrid = MTLSizeMake(tileCount, 1, 1)
+                let threadsPerThreadgroup = MTLSizeMake(min(continentMaskPipeline.maxTotalThreadsPerThreadgroup, tileCount), 1, 1)
+                maskEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+                maskEncoder.endEncoding()
+                
+                // STEP 2: Apply smoothing iterations to continent mask
+                var inputBuffer = continentMaskBuffer!
+                var outputBuffer = smoothBuffer1!
+                
+                for i in 0..<3 {
+                    let smoothEncoder = commandBuffer.makeComputeCommandEncoder()!
+                    smoothEncoder.setComputePipelineState(smoothingPipeline)
+                    smoothEncoder.setBuffer(inputBuffer, offset: 0, index: 0)
+                    smoothEncoder.setBuffer(outputBuffer, offset: 0, index: 1)
+                    smoothEncoder.setBuffer(positionsBuffer, offset: 0, index: 2)
+                    var radius: Float = 0.2
+                    smoothEncoder.setBytes(&radius, length: MemoryLayout<Float>.size, index: 3)
+                    smoothEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
+                    
+                    // Allocate threadgroup memory for the optimized smoothing kernel
+                    let threadgroupMemoryLength = min(smoothingPipeline.maxTotalThreadsPerThreadgroup, tileCount)
+                    let posSharedMemSize = (MemoryLayout<Float>.stride * 3 * threadgroupMemoryLength + 15) & ~15
+                    let valSharedMemSize = (MemoryLayout<Float>.stride * 3 * threadgroupMemoryLength + 15) & ~15
+                    
+                    smoothEncoder.setThreadgroupMemoryLength(posSharedMemSize, index: 0)
+                    smoothEncoder.setThreadgroupMemoryLength(valSharedMemSize, index: 1)
+                    
+                    smoothEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+                    smoothEncoder.endEncoding()
+                    
+                    // Swap buffers for next iteration
+                    let temp = inputBuffer
+                    inputBuffer = outputBuffer
+                    outputBuffer = (i == 1) ? smoothBuffer2! : temp
                 }
-            }
-            print("Final Smoothed Elevation (first \(finalElevationValues.count) values): \(finalElevationValues)")
+                
+                // Set up barrier to ensure smoothing is complete before reading values for threshold
+                let barrierEncoder = commandBuffer.makeBlitCommandEncoder()!
+                barrierEncoder.endEncoding()
+                
+                commandBuffer.commit()
+                
+                // Wait only at this point, after smoothing
+                commandBuffer.waitUntilCompleted()
+                
+                // Calculate ocean threshold from smoothed continent mask
+                var continentMaskFinal = [Float](repeating: 0, count: tileCount)
+                let finalMaskPtr = inputBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+                for i in 0..<tileCount {
+                    continentMaskFinal[i] = finalMaskPtr[i]
+                }
 
-        } // end autoreleasepool
-    }
+                let sortedElevations = continentMaskFinal.sorted()
+                let thresholdIndex = Int(Float(tileCount) * oceanRatio)
+                var oceanThreshold = thresholdIndex < sortedElevations.count ? sortedElevations[thresholdIndex] : 0.5
+                
+                // Create new command buffer for the rest of the work
+                let finalCommandBuffer = commandQueue.makeCommandBuffer()!
+                
+                // STEP 3: Final elevation generation
+                let elevEncoder = finalCommandBuffer.makeComputeCommandEncoder()!
+                elevEncoder.setComputePipelineState(elevationPipeline)
+                elevEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
+                elevEncoder.setBuffer(inputBuffer, offset: 0, index: 1) // Final smoothed continent mask
+                elevEncoder.setBuffer(elevationBuffer, offset: 0, index: 2)
+                elevEncoder.setBuffer(permTableBuffer, offset: 0, index: 3)
 
-    // Keep original CPU functions for fallback or reference
+                elevEncoder.setBytes(&oceanThreshold, length: MemoryLayout<Float>.size, index: 4)
+                elevEncoder.setBytes(&seaLevel, length: MemoryLayout<Float>.size, index: 5)
+                elevEncoder.setBytes(&highPeakLevel, length: MemoryLayout<Float>.size, index: 6)
+                elevEncoder.setBytes(&deepOceanLevel, length: MemoryLayout<Float>.size, index: 7)
+                elevEncoder.setBytes(&deepOceanStartRatio, length: MemoryLayout<Float>.size, index: 8)
+                elevEncoder.setBytes(&oceanWorld, length: MemoryLayout<Bool>.size, index: 9)
+                elevEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 10)
+
+                elevEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+                elevEncoder.endEncoding()
+                
+                // Apply final smoothing
+                let smoothEncoderFinal = finalCommandBuffer.makeComputeCommandEncoder()!
+                smoothEncoderFinal.setComputePipelineState(smoothingPipeline)
+                smoothEncoderFinal.setBuffer(elevationBuffer, offset: 0, index: 0)
+                smoothEncoderFinal.setBuffer(finalSmoothBuffer, offset: 0, index: 1)
+                smoothEncoderFinal.setBuffer(positionsBuffer, offset: 0, index: 2)
+                var finalRadius: Float = 0.05
+                smoothEncoderFinal.setBytes(&finalRadius, length: MemoryLayout<Float>.size, index: 3)
+                smoothEncoderFinal.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
+                
+                let threadgroupMemoryLength = min(smoothingPipeline.maxTotalThreadsPerThreadgroup, tileCount)
+                let posSharedMemSize = (MemoryLayout<Float>.stride * 3 * threadgroupMemoryLength + 15) & ~15
+                let valSharedMemSize = (MemoryLayout<Float>.stride * 3 * threadgroupMemoryLength + 15) & ~15
+                
+                smoothEncoderFinal.setThreadgroupMemoryLength(posSharedMemSize, index: 0)
+                smoothEncoderFinal.setThreadgroupMemoryLength(valSharedMemSize, index: 1)
+
+                smoothEncoderFinal.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+                smoothEncoderFinal.endEncoding()
+
+                finalCommandBuffer.commit()
+                finalCommandBuffer.waitUntilCompleted()
+                
+                let finalElevationPtr = finalSmoothBuffer!.contents().bindMemory(to: Float.self, capacity: tileCount)
+                for i in 0..<tileCount {
+                    heightMap[i] = finalElevationPtr[i]
+                }
+                
+            } // end autoreleasepool
+        }
+
     func generateElevation(from mesh: Mesh) {
         // Use GPU version instead
         generateElevationGPU(from: mesh)
