@@ -9,7 +9,7 @@ import SwiftUI
 
 struct EditorView: View {
     var renderControl: RenderControl
-    var planetName: String = "Planet K28-B"
+    @State var planetName: String = generateNewPlanetName(current: "")
     
     @State private var startingOffset: CGFloat = UIScreen.main.bounds.height * 0.59
     @State private var currentOffset: CGFloat = 0
@@ -26,6 +26,8 @@ struct EditorView: View {
     
     func randomize() {
         renderControl.seed = Int.random(in: 0..<10000)
+        
+        planetName = EditorView.generateNewPlanetName(current: planetName)
         
         renderControl.elevationController = [Float.random(in: 0.5...5.0), Float.random(in: 0.0...1.0)]
         renderControl.temperatureController = [Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0)]
@@ -127,6 +129,17 @@ struct EditorView: View {
             return 250 + (excess * 0.2)
         }
         return distance
+    }
+    
+    static func generateNewPlanetName(current: String) -> String {
+        var newName: String
+        repeat {
+            let letters = String((0..<2).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ".randomElement()! })
+            let numbers = Int.random(in: 10...99)
+            let suffix = ["A", "B", "C", "D", "E", "F"].randomElement()!
+            newName = "Planet \(letters)\(numbers)-\(suffix)"
+        } while newName == current
+        return newName
     }
 }
 
