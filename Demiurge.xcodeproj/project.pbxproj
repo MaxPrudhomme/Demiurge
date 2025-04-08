@@ -6,11 +6,27 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		AB2C94EB2DA5771000707525 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABC40C092D83216400F4B054 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ABC40C102D83216400F4B054;
+			remoteInfo = Demiurge;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		AB2C94E52DA5771000707525 /* DemiurgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DemiurgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ABBB6F712D96AB980061DE78 /* Demiurge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Demiurge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AB2C94E62DA5771000707525 /* DemiurgeUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DemiurgeUITests;
+			sourceTree = "<group>";
+		};
 		ABC40C132D83216400F4B054 /* Demiurge */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Demiurge;
@@ -19,6 +35,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AB2C94E22DA5771000707525 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ABC40C0E2D83216400F4B054 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -34,12 +57,37 @@
 			children = (
 				ABC40C132D83216400F4B054 /* Demiurge */,
 				ABBB6F712D96AB980061DE78 /* Demiurge.app */,
+				AB2C94E52DA5771000707525 /* DemiurgeUITests.xctest */,
+				AB2C94E62DA5771000707525 /* DemiurgeUITests */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AB2C94E42DA5771000707525 /* DemiurgeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB2C94EF2DA5771000707525 /* Build configuration list for PBXNativeTarget "DemiurgeUITests" */;
+			buildPhases = (
+				AB2C94E12DA5771000707525 /* Sources */,
+				AB2C94E22DA5771000707525 /* Frameworks */,
+				AB2C94E32DA5771000707525 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AB2C94EC2DA5771000707525 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AB2C94E62DA5771000707525 /* DemiurgeUITests */,
+			);
+			name = DemiurgeUITests;
+			packageProductDependencies = (
+			);
+			productName = DemiurgeUITests;
+			productReference = AB2C94E52DA5771000707525 /* DemiurgeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		ABC40C102D83216400F4B054 /* Demiurge */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = ABC40C1F2D83216500F4B054 /* Build configuration list for PBXNativeTarget "Demiurge" */;
@@ -72,6 +120,10 @@
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
+					AB2C94E42DA5771000707525 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = ABC40C102D83216400F4B054;
+					};
 					ABC40C102D83216400F4B054 = {
 						CreatedOnToolsVersion = 16.2;
 					};
@@ -92,11 +144,19 @@
 			projectRoot = "";
 			targets = (
 				ABC40C102D83216400F4B054 /* Demiurge */,
+				AB2C94E42DA5771000707525 /* DemiurgeUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AB2C94E32DA5771000707525 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ABC40C0F2D83216400F4B054 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -107,6 +167,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AB2C94E12DA5771000707525 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ABC40C0D2D83216400F4B054 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -116,7 +183,49 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AB2C94EC2DA5771000707525 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ABC40C102D83216400F4B054 /* Demiurge */;
+			targetProxy = AB2C94EB2DA5771000707525 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		AB2C94ED2DA5771000707525 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74BX245RVN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maxprudhomme.DemiurgeUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Demiurge;
+			};
+			name = Debug;
+		};
+		AB2C94EE2DA5771000707525 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 74BX245RVN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maxprudhomme.DemiurgeUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Demiurge;
+			};
+			name = Release;
+		};
 		ABC40C1D2D83216500F4B054 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -297,6 +406,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AB2C94EF2DA5771000707525 /* Build configuration list for PBXNativeTarget "DemiurgeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB2C94ED2DA5771000707525 /* Debug */,
+				AB2C94EE2DA5771000707525 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		ABC40C0C2D83216400F4B054 /* Build configuration list for PBXProject "Demiurge" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
