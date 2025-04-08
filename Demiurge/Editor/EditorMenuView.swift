@@ -23,6 +23,8 @@ struct EditorMenuView: View {
             
             if selectedOption == "Elevation" {
                 ElevationView(renderControl: renderControl)
+            } else if selectedOption == "Temperature" {
+                TemperatureView(renderControl: renderControl)
             }
         }
     }

@@ -20,4 +20,7 @@ class RenderControl: ObservableObject {
     
     // Continent Scale / Ocean Ratio / Variance
     @Published var elevationController: [Float] = [2.5, 0.65, 1.0]
+    
+    // Equator Temperature / Pole Drop / Temperature Lapse Rate
+    @Published var temperatureController: [Float] = [0.8, 0.9, 0.5]
 }
