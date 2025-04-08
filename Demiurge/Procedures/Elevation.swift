@@ -1,13 +1,14 @@
 //
-//  Elevation.swift
-//  Demiurge
+//  Elevation.swift
+//  Demiurge
 //
-//  Created by Max PRUDHOMME on 22/03/2025.
+//  Created by Max PRUDHOMME on 22/03/2025.
 //
 
 import Foundation
 import simd
 import Combine
+import Metal
 
 class Elevation {
     var heightMap: [Float]
@@ -15,12 +16,24 @@ class Elevation {
     var renderControl: RenderControl
     private var noiseGenerator: SimplexNoise
 
+    // Metal properties
+    private var metalDevice: MTLDevice!
+    private var commandQueue: MTLCommandQueue!
+    private var continentMaskPipeline: MTLComputePipelineState!
+    private var smoothingPipeline: MTLComputePipelineState!
+    private var elevationPipeline: MTLComputePipelineState!
+    private var permTableBuffer: MTLBuffer!
+
+    // Cached position buffer for reuse
+    private var positionsBuffer: MTLBuffer?
+    private var tilePositions: [SIMD3<Float>]?
+
     // Constants for elevation distribution
-    private let seaLevel: Float = 0.0        // Zero is sea level
-    private let deepOceanStartRatio: Float = 0.8 // Percentage into the ocean range where deep ocean starts
-    private var oceanRatio: Float = 0.65     // Percentage of planet that should be ocean
+    private var seaLevel: Float = 0.0        // Zero is sea level
+    private var deepOceanStartRatio: Float = 0.8 // Percentage into the ocean range where deep ocean starts
+    private var oceanRatio: Float = 0.65         // Percentage of planet that should be ocean
     private var deepOceanLevel: Float = -0.8 // Lowest point in the ocean
-    private var highPeakLevel: Float = 0.8  // Highest mountain peaks1
+    private var highPeakLevel: Float = 0.8    // Highest mountain peaks1
 
     // New parameter to control the scale/frequency of continents
     var continentScale: Float = 2.5
@@ -30,136 +43,251 @@ class Elevation {
         self.heightMap = [Float](repeating: 0, count: tiles)
         self.noiseGenerator = SimplexNoise(seed: seed)
         self.renderControl = renderControl
-        
         self.continentScale = renderControl.elevationController[0]
+        self.tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tiles)
+
+        setupMetal(seed: seed)
     }
-    
+
+    private func setupMetal(seed: Int) {
+        // Get the default Metal device
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            fatalError("Metal is not supported on this device")
+        }
+        self.metalDevice = device
+
+        // Create a command queue
+        guard let queue = device.makeCommandQueue() else {
+            fatalError("Could not create Metal command queue")
+        }
+        self.commandQueue = queue
+
+        // Create permutation table buffer for noise generation
+        var permArray = [Int](repeating: 0, count: 512)
+            srand48(seed)
+
+            // Generate the same permutation table as the CPU version
+            var p = [Int](0..<256)
+            for i in 0..<256 {
+                let j = Int(drand48() * Double(256 - i)) + i
+                p.swapAt(i, j)
+            }
+
+            for i in 0..<256 {
+                permArray[i] = p[i]
+                permArray[i + 256] = p[i]
+            }
+
+            // Create buffer with the permutation table
+            self.permTableBuffer = device.makeBuffer(bytes: permArray,
+                                                    length: MemoryLayout<Int>.stride * permArray.count,
+                                                    options: [])
+
+        // Load the Metal library
+        guard let library = device.makeDefaultLibrary() else {
+            fatalError("Could not load default Metal library")
+        }
+
+        // Create the compute pipelines
+        do {
+            let continentMaskFunction = library.makeFunction(name: "generateContinentMask")!
+            self.continentMaskPipeline = try device.makeComputePipelineState(function: continentMaskFunction)
+
+            let smoothingFunction = library.makeFunction(name: "smoothValues")!
+            self.smoothingPipeline = try device.makeComputePipelineState(function: smoothingFunction)
+
+            let elevationFunction = library.makeFunction(name: "generateElevation")!
+            self.elevationPipeline = try device.makeComputePipelineState(function: elevationFunction)
+        } catch {
+            fatalError("Failed to create compute pipeline: \(error)")
+        }
+    }
+
     func regenerate() {
-        
+        // Reset cached data if needed
+        self.positionsBuffer = nil
+        self.tilePositions = nil
     }
-    
+
     func modifyTerrain(newValues: [Float], mesh: Mesh) {
         self.continentScale = newValues[0]
         self.oceanRatio = newValues[1]
-        
-        generateElevation(from: mesh)
-    }
-    
-    func generateElevation(from mesh: Mesh) {
-        let oceanWorld: Bool = oceanRatio >= 1.0
-        
-        // Store tile center positions for later use
-        var tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
 
-        // First pass: Generate continent masks with values in 0-1 range
-        var rawContinentMask = [Float](repeating: 0, count: tileCount)
+        generateElevationGPU(from: mesh)
+    }
+
+    func generateElevationGPU(from mesh: Mesh) {
+        print("!!! Running ON GPU !!!")
+
+        var oceanWorld: Bool = oceanRatio >= 1.0
+
+        // Always recalculate tile positions
+        tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
 
         for i in 0..<tileCount {
             let centerVertex = mesh.getVertex(forVertexIndex: mesh.tileIndex[i])
-            let pos = centerVertex.position.normalized()
-            tilePositions[i] = pos
-
-            // Generate large-scale continent shapes (very low frequency)
-            var continentValue: Float = 0
-            var amplitude: Float = 1.0
-            let persistence: Float = 0.5
-            let continentFrequencyBase: Float = 0.5 // Base lower frequency
-            let continentFrequency = continentFrequencyBase * continentScale // Apply the scale
-
-            // Use 3 octaves for continents - fewer octaves = larger features
-            for octave in 0..<3 {
-                let freq = continentFrequency * pow(2.0, Float(octave))
-                let noiseValue = sampleSphericalNoise(at: pos * freq)
-                continentValue += noiseValue * amplitude
-                amplitude *= persistence
-            }
-
-            // Normalize to 0-1
-            continentValue = (continentValue + 1.0) * 0.5
-
-            // Make continents more distinct with a curve
-            continentValue = pow(continentValue, 1.2)
-
-            rawContinentMask[i] = continentValue
+            print("Raw Vertex Position (\(i)): \(centerVertex.position)") // Keep this for debugging
+            let normalizedPosition = centerVertex.position.normalized()
+            print("Normalized Position (\(i)): \(normalizedPosition)") // Keep this for debugging
+            tilePositions![i] = normalizedPosition
         }
 
-        // Smooth the continent mask
-        let continentMask = spatialSmoothing(values: rawContinentMask, positions: tilePositions, radius: 0.2, iterations: 3)
-
-        // Find threshold value that gives us desired ocean ratio
-        let sortedElevations = continentMask.sorted()
-        let thresholdIndex = Int(Float(tileCount) * oceanRatio)
-        let oceanThreshold = thresholdIndex < sortedElevations.count ? sortedElevations[thresholdIndex] : 0.5
-
-        // Second pass: Generate detailed terrain features with proper elevation range
-        for i in 0..<tileCount {
-            let pos = tilePositions[i]
-            let continentValue = continentMask[i]
-
-            // Determine if this is land or ocean
-            let isLand = continentValue > oceanThreshold
-
-            var elevation: Float
-
-            if isLand && !oceanWorld{
-                // Land: Scale from sea level (0.0) up to mountain peaks (highPeakLevel)
-
-                // How far above threshold are we (0-1 range)
-                let landRatio = (continentValue - oceanThreshold) / (1.0 - oceanThreshold)
-
-                // Generate detailed land terrain
-                let detailNoise = generateLandTerrain(at: pos)
-
-                // Combine base elevation with details
-                // Higher base elevation = higher mountains
-                elevation = landRatio * highPeakLevel * 0.7 + detailNoise * highPeakLevel * 0.3
-
-                // Add mountains near coastlines (modified logic)
-                let coastalDistance = abs(continentValue - oceanThreshold) * 15.0
-                if coastalDistance < 1.0 {
-                    let mountainFactor = sin(coastalDistance * Float.pi).clamped(to: 0...1) // Ensure factor is not negative
-                    let mountainNoise = sampleSphericalNoise(at: pos * 3.0 + SIMD3<Float>(1.5, 2.3, 3.1)) * 0.5 + 0.5 // Normalize noise to 0-1
-                    // Blend mountain noise with existing elevation
-                    elevation += mountainFactor * mountainNoise * highPeakLevel * 0.6 * (1.0 - landRatio * 0.5) // Reduce mountain height further inland
-                }
-
-                // Ensure minimum land elevation is at sea level
-                elevation = max(seaLevel, elevation)
-            } else {
-                // Ocean: Scale from ocean threshold (0.0) down to deep ocean (deepOceanLevel)
-
-                // How far below threshold are we (0-1 range)
-                let oceanRatio = (oceanThreshold - continentValue) / oceanThreshold
-
-                // Generate ocean floor terrain
-                let oceanFloorNoise = generateOceanTerrain(at: pos)
-
-                // Base ocean depth
-                elevation = -oceanRatio * abs(deepOceanLevel) * 0.7 - oceanFloorNoise * abs(deepOceanLevel) * 0.3
-
-                // Add trenches in deeper ocean areas
-                // Deep ocean starts when oceanRatio is above deepOceanStartRatio
-                if oceanRatio > deepOceanStartRatio {
-                    let trenchNoise = sampleSphericalNoise(at: pos * 2.0 + SIMD3<Float>(3.7, 1.9, 2.6))
-                    if trenchNoise > 0.6 { // Slightly lower threshold for trenches
-                        let trenchFactor = (trenchNoise - 0.6) / 0.4 // Adjust factor range
-                        elevation -= trenchFactor * abs(deepOceanLevel) * 0.6 // Deeper trenches
-                    }
-                }
-
-                // Ensure maximum ocean elevation is just below sea level
-                elevation = min(seaLevel - 0.01, elevation)
-            }
-
-            // Store the final elevation
-            heightMap[i] = elevation
+        // Create or update the positions buffer
+        if positionsBuffer == nil {
+            positionsBuffer = metalDevice.makeBuffer(bytes: tilePositions!,
+                                                    length: MemoryLayout<SIMD3<Float>>.stride * tileCount,
+                                                    options: [])
+        } else {
+            // Update the existing buffer with new data
+            positionsBuffer?.contents().copyMemory(from: tilePositions!, byteCount: MemoryLayout<SIMD3<Float>>.stride * tileCount)
         }
 
-        // Apply final smoothing to reduce artifacts
-        heightMap = spatialSmoothing(values: heightMap, positions: tilePositions, radius: 0.05, iterations: 1)
+        // Create buffers for each step
+        let continentMaskBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
+        let smoothBuffer1 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
+        let smoothBuffer2 = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
+        let elevationBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
+        let finalSmoothBuffer = metalDevice.makeBuffer(length: MemoryLayout<Float>.stride * tileCount, options: [])!
 
-        // Print distribution stats for debugging
-//        printElevationStats()
+        // Create an autorelease pool for temporary Metal objects
+        autoreleasepool {
+            // STEP 1: Generate continent mask
+            let maskCommandBuffer = commandQueue.makeCommandBuffer()!
+            let maskEncoder = maskCommandBuffer.makeComputeCommandEncoder()!
+
+            maskEncoder.setComputePipelineState(continentMaskPipeline)
+            maskEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
+            maskEncoder.setBuffer(continentMaskBuffer, offset: 0, index: 1)
+            maskEncoder.setBuffer(permTableBuffer, offset: 0, index: 2)
+            var scale = continentScale
+            maskEncoder.setBytes(&scale, length: MemoryLayout<Float>.size, index: 3)
+            var count = UInt32(tileCount)
+            maskEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
+
+            let threadsPerGrid = MTLSizeMake(tileCount, 1, 1)
+            let threadsPerThreadgroup = MTLSizeMake(min(continentMaskPipeline.maxTotalThreadsPerThreadgroup, tileCount), 1, 1)
+            maskEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+            maskEncoder.endEncoding()
+
+            maskCommandBuffer.commit()
+            maskCommandBuffer.waitUntilCompleted()
+
+            // DEBUG: Read and print continent mask values
+            var continentMaskValues = [Float](repeating: 0, count: min(10, tileCount))
+            let continentMaskPtr = continentMaskBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+            for i in 0..<min(10, tileCount) {
+                continentMaskValues[i] = continentMaskPtr[i]
+            }
+            print("Continent Mask (first \(continentMaskValues.count) values): \(continentMaskValues)")
+
+            // STEP 2: Apply smoothing iterations to continent mask
+            var inputBuffer = continentMaskBuffer
+            var outputBuffer = smoothBuffer1
+
+            for i in 0..<3 {
+                let smoothCommandBuffer = commandQueue.makeCommandBuffer()! // Create a new command buffer for each smoothing pass for easier debugging
+                let smoothEncoder = smoothCommandBuffer.makeComputeCommandEncoder()!
+
+                smoothEncoder.setComputePipelineState(smoothingPipeline)
+                smoothEncoder.setBuffer(inputBuffer, offset: 0, index: 0)
+                smoothEncoder.setBuffer(outputBuffer, offset: 0, index: 1)
+                smoothEncoder.setBuffer(positionsBuffer, offset: 0, index: 2)
+                var radius: Float = 0.2
+                smoothEncoder.setBytes(&radius, length: MemoryLayout<Float>.size, index: 3)
+                smoothEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
+
+                smoothEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+                smoothEncoder.endEncoding()
+
+                smoothCommandBuffer.commit()
+                smoothCommandBuffer.waitUntilCompleted()
+
+                // Swap buffers for next iteration
+                let temp = inputBuffer
+                inputBuffer = outputBuffer
+                outputBuffer = (i == 1) ? smoothBuffer2 : temp
+            }
+
+            // Calculate ocean threshold from smoothed continent mask
+            var continentMaskFinal = [Float](repeating: 0, count: tileCount)
+            let finalMaskPtr = inputBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+            for i in 0..<tileCount {
+                continentMaskFinal[i] = finalMaskPtr[i]
+            }
+
+            let sortedElevations = continentMaskFinal.sorted()
+            let thresholdIndex = Int(Float(tileCount) * oceanRatio)
+            var oceanThreshold = thresholdIndex < sortedElevations.count ? sortedElevations[thresholdIndex] : 0.5
+            print("Ocean Threshold: \(oceanThreshold)")
+
+            // STEP 3: Final elevation generation
+            let elevationCommandBuffer = commandQueue.makeCommandBuffer()!
+            let elevEncoder = elevationCommandBuffer.makeComputeCommandEncoder()!
+
+            elevEncoder.setComputePipelineState(elevationPipeline)
+            elevEncoder.setBuffer(positionsBuffer, offset: 0, index: 0)
+            elevEncoder.setBuffer(inputBuffer, offset: 0, index: 1) // Final smoothed continent mask
+            elevEncoder.setBuffer(elevationBuffer, offset: 0, index: 2)
+            elevEncoder.setBuffer(permTableBuffer, offset: 0, index: 3)
+
+            elevEncoder.setBytes(&oceanThreshold, length: MemoryLayout<Float>.size, index: 4)
+            elevEncoder.setBytes(&seaLevel, length: MemoryLayout<Float>.size, index: 5)
+            elevEncoder.setBytes(&highPeakLevel, length: MemoryLayout<Float>.size, index: 6)
+            elevEncoder.setBytes(&deepOceanLevel, length: MemoryLayout<Float>.size, index: 7)
+            elevEncoder.setBytes(&deepOceanStartRatio, length: MemoryLayout<Float>.size, index: 8)
+            elevEncoder.setBytes(&oceanWorld, length: MemoryLayout<Bool>.size, index: 9)
+            elevEncoder.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 10)
+
+            elevEncoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+            elevEncoder.endEncoding()
+
+            elevationCommandBuffer.commit()
+            elevationCommandBuffer.waitUntilCompleted()
+
+            // DEBUG: Read and print elevation buffer values
+            var elevationValues = [Float](repeating: 0, count: min(10, tileCount))
+            let elevationPtr = elevationBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+            for i in 0..<min(10, tileCount) {
+                elevationValues[i] = elevationPtr[i]
+            }
+            print("Elevation Buffer (first \(elevationValues.count) values): \(elevationValues)")
+
+            // Apply final smoothing
+            let finalSmoothCommandBuffer = commandQueue.makeCommandBuffer()!
+            let smoothEncoderFinal = finalSmoothCommandBuffer.makeComputeCommandEncoder()!
+
+            smoothEncoderFinal.setComputePipelineState(smoothingPipeline)
+            smoothEncoderFinal.setBuffer(elevationBuffer, offset: 0, index: 0)
+            smoothEncoderFinal.setBuffer(finalSmoothBuffer, offset: 0, index: 1)
+            smoothEncoderFinal.setBuffer(positionsBuffer, offset: 0, index: 2)
+            var finalRadius: Float = 0.05
+            smoothEncoderFinal.setBytes(&finalRadius, length: MemoryLayout<Float>.size, index: 3)
+            smoothEncoderFinal.setBytes(&count, length: MemoryLayout<UInt32>.size, index: 4)
+
+            smoothEncoderFinal.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerThreadgroup)
+            smoothEncoderFinal.endEncoding()
+
+            finalSmoothCommandBuffer.commit()
+            finalSmoothCommandBuffer.waitUntilCompleted()
+
+            // DEBUG: Read and print final smoothed elevation values
+            var finalElevationValues = [Float](repeating: 0, count: min(10, tileCount))
+            let finalElevationPtr = finalSmoothBuffer.contents().bindMemory(to: Float.self, capacity: tileCount)
+            for i in 0..<tileCount {
+                heightMap[i] = finalElevationPtr[i]
+                if i < 10 {
+                    finalElevationValues[i] = heightMap[i]
+                }
+            }
+            print("Final Smoothed Elevation (first \(finalElevationValues.count) values): \(finalElevationValues)")
+
+        } // end autoreleasepool
+    }
+
+    // Keep original CPU functions for fallback or reference
+    func generateElevation(from mesh: Mesh) {
+        // Use GPU version instead
+        generateElevationGPU(from: mesh)
     }
 
     private func printElevationStats() {
@@ -171,8 +299,8 @@ class Elevation {
         let q3 = sorted[sorted.count*3/4]
 
         print("Elevation stats:")
-        print("  Range: \(min) to \(max)")
-        print("  Quartiles: \(q1) / \(median) / \(q3)")
+        print("  Range: \(min) to \(max)")
+        print("  Quartiles: \(q1) / \(median) / \(q3)")
 
         // Count distribution
         var deepOcean = 0, ocean = 0, shallows = 0, land = 0, hills = 0, mountains = 0, peaks = 0
@@ -187,14 +315,14 @@ class Elevation {
             else { peaks += 1 }
         }
 
-        print("  Distribution:")
-        print("    Deep ocean: \(deepOcean) (\(Float(deepOcean)/Float(tileCount)*100)%)")
-        print("    Ocean: \(ocean) (\(Float(ocean)/Float(tileCount)*100)%)")
-        print("    Shallows: \(shallows) (\(Float(shallows)/Float(tileCount)*100)%)")
-        print("    Land: \(land) (\(Float(land)/Float(tileCount)*100)%)")
-        print("    Hills: \(hills) (\(Float(hills)/Float(tileCount)*100)%)")
-        print("    Mountains: \(mountains) (\(Float(mountains)/Float(tileCount)*100)%)")
-        print("    Peaks: \(peaks) (\(Float(peaks)/Float(tileCount)*100)%)")
+        print("  Distribution:")
+        print("    Deep ocean: \(deepOcean) (\(Float(deepOcean)/Float(tileCount)*100)%)")
+        print("    Ocean: \(ocean) (\(Float(ocean)/Float(tileCount)*100)%)")
+        print("    Shallows: \(shallows) (\(Float(shallows)/Float(tileCount)*100)%)")
+        print("    Land: \(land) (\(Float(land)/Float(tileCount)*100)%)")
+        print("    Hills: \(hills) (\(Float(hills)/Float(tileCount)*100)%)")
+        print("    Mountains: \(mountains) (\(Float(mountains)/Float(tileCount)*100)%)")
+        print("    Peaks: \(peaks) (\(Float(peaks)/Float(tileCount)*100)%)")
     }
 
     // Generate detailed terrain for land areas

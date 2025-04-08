@@ -39,9 +39,21 @@ class Orchestrator {
         renderControl.$elevationController
             .sink { [weak self] newValues in
                 self?.elevation.modifyTerrain(newValues: newValues, mesh: mesh)
-                self?.humidity.modifyHumidity(newValues: renderControl.humidityController, mesh: mesh, elevation: self!.elevation)
-                self?.temperature.modifyTemperature(newValues: renderControl.temperatureController, mesh: mesh, elevation: self!.elevation)
-                self?.handleLayerChange(renderControl.layer)
+
+                Task { [weak self] in
+                    guard let self = self else { return }
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            self.humidity.modifyHumidity(newValues: renderControl.humidityController, mesh: mesh, elevation: self.elevation)
+                        }
+                        group.addTask {
+                            self.temperature.modifyTemperature(newValues: renderControl.temperatureController, mesh: mesh, elevation: self.elevation)
+                        }
+                    }
+                    // Optionally perform actions after both modifications are complete
+                    // print("Humidity and temperature modifications complete.")
+                    self.handleLayerChange(renderControl.layer)
+                }
             }
             .store(in: &cancellables)
         
@@ -199,7 +211,7 @@ class Orchestrator {
             biomeCounts[biome] = (biomeCounts[biome] ?? 0) + 1
         }
 
-        print("Biome Counts: \(biomeCounts)")
+//        print("Biome Counts: \(biomeCounts)")
         changeColorMap(map: biomeMap)
     }
     

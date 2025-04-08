@@ -41,7 +41,7 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]]) {
 }
 
 fragment float4 edgeFragmentShader(VertexOut in [[stage_in]]) {
-    return float4(1.0, 1.0, 1.0, 1.0);
+    return float4(1.0, 1.0, 1.0, 0.5);
 }
 
 fragment float4 vertexPointFragmentShader(VertexOut in [[stage_in]]) {
