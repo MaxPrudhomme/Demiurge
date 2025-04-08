@@ -17,15 +17,18 @@ class Orchestrator {
     
     let elevation: Elevation
     let temperature: Temperature
+    let humidity: Humidity
     
     init(renderControl: RenderControl, device: MTLDevice, mesh: Mesh) {
         self.renderControl = renderControl
         self.mesh = mesh
         self.elevation = Elevation(tiles: mesh.tileCount, renderControl: renderControl)
         self.temperature = Temperature(tiles: mesh.tileCount, renderControl: renderControl)
+        self.humidity = Humidity(tiles: mesh.tileCount, renderControl: renderControl)
         
         elevation.generateElevation(from: mesh)
         temperature.generateTemperature(mesh: mesh, elevation: elevation)
+        humidity.generateHumidity(mesh: mesh, elevation: elevation)
         
         renderControl.$layer
             .sink { [weak self] newLayer in
@@ -36,6 +39,7 @@ class Orchestrator {
         renderControl.$elevationController
             .sink { [weak self] newValues in
                 self?.elevation.modifyTerrain(newValues: newValues, mesh: mesh)
+                self?.humidity.modifyHumidity(newValues: renderControl.humidityController, mesh: mesh, elevation: self!.elevation)
                 self?.temperature.modifyTemperature(newValues: renderControl.temperatureController, mesh: mesh, elevation: self!.elevation)
                 self?.handleLayerChange(renderControl.layer)
             }
@@ -44,6 +48,13 @@ class Orchestrator {
         renderControl.$temperatureController
             .sink { [weak self] newValues in
                 self?.temperature.modifyTemperature(newValues: newValues, mesh: mesh, elevation: self!.elevation)
+                self?.handleLayerChange(renderControl.layer)
+            }
+            .store(in: &cancellables)
+        
+        renderControl.$humidityController
+            .sink { [weak self] newValues in
+                self?.humidity.modifyHumidity(newValues: newValues, mesh: mesh, elevation: self!.elevation)
                 self?.handleLayerChange(renderControl.layer)
             }
             .store(in: &cancellables)
@@ -56,7 +67,7 @@ class Orchestrator {
         case "Temperature":
             showTemperature()
         case "Humidity":
-            break
+            showHumidity()
         case "All layers":
             showAllLayers()
             break
@@ -67,7 +78,7 @@ class Orchestrator {
     
     func showAllLayers() {
         // TEMP: will be changed later on.
-        showTemperature()
+        showHumidity()
     }
     
     func showElevation() {
@@ -120,6 +131,19 @@ class Orchestrator {
         changeColorMap(map: colorMap)
     }
     
+    func showHumidity() {
+        let humidityMap: [Float] = humidity.humidityMap
+
+        // Define a color map for humidity (e.g., white for dry, blue for moist)
+        let dryColor = SIMD4<Float>(1.0, 1.0, 1.0, 1.0) // White
+        let moistColor = SIMD4<Float>(0.0, 0.0, 1.0, 1.0) // Blue
+
+        let colorMap: [SIMD4<Float>] = humidityMap.map { humidityValue in
+            return lerpColor(dryColor, moistColor, humidityValue)
+        }
+
+        changeColorMap(map: colorMap)
+    }
     
     func changeColorMap(map: [SIMD4<Float>]) {
         for (mapIndex, index) in mesh.tileIndex.enumerated() {

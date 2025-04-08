@@ -23,4 +23,7 @@ class RenderControl: ObservableObject {
     
     // Equator Temperature / Pole Drop / Temperature Lapse Rate
     @Published var temperatureController: [Float] = [0.8, 0.9, 0.5]
+    
+    // Equator Humidity / Polar Humidity Drop / Elevation Humidity Drop / Water Influence
+    @Published var humidityController: [Float] = [0.7, 0.8, 0.6, 0.4]
 }

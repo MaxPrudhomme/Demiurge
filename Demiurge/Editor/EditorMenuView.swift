@@ -16,7 +16,7 @@ struct EditorMenuView: View {
             Picker("Select Parameter", selection: $selectedOption) {
                 Text("Temperature").tag("Temperature")
                 Text("Elevation").tag("Elevation")
-                Text("Moisture").tag("Moisture")
+                Text("Humidity").tag("Humidity")
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding(16)
@@ -25,6 +25,8 @@ struct EditorMenuView: View {
                 ElevationView(renderControl: renderControl)
             } else if selectedOption == "Temperature" {
                 TemperatureView(renderControl: renderControl)
+            } else  if selectedOption == "Humidity" {
+                HumidityView(renderControl: renderControl)
             }
         }
     }
