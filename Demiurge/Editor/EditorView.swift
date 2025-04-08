@@ -9,14 +9,14 @@ import SwiftUI
 
 struct EditorView: View {
     var renderControl: RenderControl
-    @State var planetName: String = generateNewPlanetName(current: "")
     
     @State private var startingOffset: CGFloat = UIScreen.main.bounds.height * 0.59
     @State private var currentOffset: CGFloat = 0
     @State private var endOffset: CGFloat = 0
     
-    @State private var bounce_books = false
+    @State private var bounce_binoculars = false
     @State private var bounce_dice = false
+    @State private var isObservatoryPresented = false
     
     private let fullScreenThreshold: CGFloat = -150
     private let dismissThreshold: CGFloat = 150
@@ -26,8 +26,7 @@ struct EditorView: View {
     
     func randomize() {
         renderControl.seed = Int.random(in: 0..<10000)
-        
-        planetName = EditorView.generateNewPlanetName(current: planetName)
+        renderControl.planetName = RenderControl.generateNewPlanetName(current: renderControl.planetName)
         
         renderControl.elevationController = [Float.random(in: 0.5...5.0), Float.random(in: 0.0...1.0)]
         renderControl.temperatureController = [Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0)]
@@ -47,16 +46,17 @@ struct EditorView: View {
                     
                     HStack {
                         Button(action: {
-                            bounce_books.toggle()
+                            bounce_binoculars.toggle()
+                            isObservatoryPresented = true
                         }, label: {
-                            Image(systemName: "books.vertical")
+                            Image(systemName: "binoculars.fill")
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
-                                .symbolEffect(.bounce.up.byLayer, value: bounce_books)
+                                .symbolEffect(.bounce.up.byLayer, value: bounce_binoculars)
                                 
                         })
                         Spacer()
-                        Text(planetName)
+                        Text(renderControl.planetName)
                             .font(.title)
                         Spacer()
                         Button(action: {
@@ -112,6 +112,9 @@ struct EditorView: View {
                         }
                 )
                 .edgesIgnoringSafeArea(.bottom)
+                .sheet(isPresented: $isObservatoryPresented) {
+                    ObservatoryView(renderControl: renderControl)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -129,17 +132,6 @@ struct EditorView: View {
             return 250 + (excess * 0.2)
         }
         return distance
-    }
-    
-    static func generateNewPlanetName(current: String) -> String {
-        var newName: String
-        repeat {
-            let letters = String((0..<2).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ".randomElement()! })
-            let numbers = Int.random(in: 10...99)
-            let suffix = ["A", "B", "C", "D", "E", "F"].randomElement()!
-            newName = "Planet \(letters)\(numbers)-\(suffix)"
-        } while newName == current
-        return newName
     }
 }
 

@@ -9,11 +9,13 @@ import SwiftUI
 
 class RenderControl: ObservableObject {
     // Renderer Controller
-    @Published var rotate: Bool = false
+    @Published var rotate: Bool = true
     @Published var rescale: Bool = false
     
     // Mesh Controller
     @Published var subdivisions: Int = 3
+    
+    @Published var planetName: String = generateNewPlanetName(current: "Earth")
     
     // Orchestrator Controller
     @Published var layer: String = "All layers"
@@ -28,4 +30,15 @@ class RenderControl: ObservableObject {
     @Published var humidityController: [Float] = [0.7, 0.8, 0.6, 0.4]
     
     @Published var seed: Int = Int.random(in: 0..<10000)
+    
+    public static func generateNewPlanetName(current: String) -> String {
+        var newName: String
+        repeat {
+            let letters = String((0..<2).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ".randomElement()! })
+            let numbers = Int.random(in: 10...99)
+            let suffix = ["A", "B", "C", "D", "E", "F"].randomElement()!
+            newName = "Planet \(letters)\(numbers)-\(suffix)"
+        } while newName == current
+        return newName
+    }
 }
