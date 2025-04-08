@@ -16,13 +16,21 @@ struct EditorView: View {
     @State private var endOffset: CGFloat = 0
     
     @State private var bounce_books = false
-    @State private var bounce_hammer = false
+    @State private var bounce_dice = false
     
     private let fullScreenThreshold: CGFloat = -150
     private let dismissThreshold: CGFloat = 150
     private let midScreenPosition: CGFloat = -UIScreen.main.bounds.height * 0.3
     
     private let maxDragUpDistance: CGFloat = 50
+    
+    func randomize() {
+        renderControl.seed = Int.random(in: 0..<10000)
+        
+        renderControl.elevationController = [Float.random(in: 0.5...5.0), Float.random(in: 0.0...1.0)]
+        renderControl.temperatureController = [Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0)]
+        renderControl.humidityController = [Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0), Float.random(in: 0.0...1.0)]
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -50,12 +58,13 @@ struct EditorView: View {
                             .font(.title)
                         Spacer()
                         Button(action: {
-                            bounce_hammer.toggle()
+                            randomize()
+                            bounce_dice.toggle()
                         }, label: {
-                            Image(systemName: "hammer")
+                            Image(systemName: "dice")
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
-                                .symbolEffect(.bounce.up.byLayer, value: bounce_hammer)
+                                .symbolEffect(.bounce.up.byLayer, value: bounce_dice)
                                 
                         })
                     }

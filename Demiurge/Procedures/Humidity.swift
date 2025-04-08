@@ -45,7 +45,10 @@ class Humidity {
         // self.noiseScale = renderControl.humidityController[5]
     }
 
-    func modifyHumidity(newValues: [Float], mesh: Mesh, elevation: Elevation) {
+    func modifyHumidity(newValues: [Float], mesh: Mesh, elevation: Elevation, seed: Int? = nil) {
+        if let seed = seed {
+            self.noiseGenerator = SimplexNoise(seed: seed)
+        }
         self.equatorHumidity = newValues[0]
         self.polarHumidityDrop = newValues[1]
         self.elevationHumidityDropRate = newValues[2]

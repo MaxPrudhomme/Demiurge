@@ -26,4 +26,6 @@ class RenderControl: ObservableObject {
     
     // Equator Humidity / Polar Humidity Drop / Elevation Humidity Drop / Water Influence
     @Published var humidityController: [Float] = [0.7, 0.8, 0.6, 0.4]
+    
+    @Published var seed: Int = Int.random(in: 0..<10000)
 }

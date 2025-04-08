@@ -40,7 +40,10 @@ class Temperature {
         // self.noiseScale = renderControl.temperatureController[4]
     }
 
-    func modifyTemperature(newValues: [Float], mesh: Mesh, elevation: Elevation) {
+    func modifyTemperature(newValues: [Float], mesh: Mesh, elevation: Elevation, seed: Int? = nil) {
+        if let seed = seed {
+            self.noiseGenerator = SimplexNoise(seed: seed)
+        }
         self.equatorTemperature = newValues[0]
         self.polarTemperatureDrop = newValues[1]
         self.temperatureLapseRate = newValues[2]

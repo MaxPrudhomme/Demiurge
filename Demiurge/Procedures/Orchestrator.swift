@@ -12,6 +12,7 @@ import Combine
 class Orchestrator {
     var renderControl: RenderControl
     var mesh: Mesh!
+    var seed: Int
     
     private var cancellables: Set<AnyCancellable> = []
     
@@ -22,9 +23,10 @@ class Orchestrator {
     init(renderControl: RenderControl, device: MTLDevice, mesh: Mesh) {
         self.renderControl = renderControl
         self.mesh = mesh
-        self.elevation = Elevation(tiles: mesh.tileCount, renderControl: renderControl)
-        self.temperature = Temperature(tiles: mesh.tileCount, renderControl: renderControl)
-        self.humidity = Humidity(tiles: mesh.tileCount, renderControl: renderControl)
+        self.seed = renderControl.seed
+        self.elevation = Elevation(tiles: mesh.tileCount, seed: seed, renderControl: renderControl)
+        self.temperature = Temperature(tiles: mesh.tileCount, seed: seed, renderControl: renderControl)
+        self.humidity = Humidity(tiles: mesh.tileCount, seed: seed, renderControl: renderControl)
         
         elevation.generateElevation(from: mesh)
         temperature.generateTemperature(mesh: mesh, elevation: elevation)
@@ -52,6 +54,24 @@ class Orchestrator {
                     }
                     // Optionally perform actions after both modifications are complete
                     // print("Humidity and temperature modifications complete.")
+                    self.handleLayerChange(renderControl.layer)
+                }
+            }
+            .store(in: &cancellables)
+        
+        renderControl.$seed
+            .sink { [weak self] newSeed in
+                self?.elevation.reseed(seed: newSeed, newValues: renderControl.elevationController, mesh: mesh)
+                Task { [weak self] in
+                    guard let self = self else { return }
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            self.humidity.modifyHumidity(newValues: renderControl.humidityController, mesh: mesh, elevation: self.elevation, seed: newSeed)
+                        }
+                        group.addTask {
+                            self.temperature.modifyTemperature(newValues: renderControl.temperatureController, mesh: mesh, elevation: self.elevation, seed: newSeed)
+                        }
+                    }
                     self.handleLayerChange(renderControl.layer)
                 }
             }
