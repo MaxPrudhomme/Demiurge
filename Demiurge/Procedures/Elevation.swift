@@ -61,7 +61,7 @@ class Elevation {
         setupMetal(seed: seed)
         self.noiseGenerator = SimplexNoise(seed: seed)
         
-        generateElevationGPU(from: mesh)
+        generateElevation(from: mesh)
     }
     
     private func setupMetal(seed: Int) {
@@ -148,7 +148,7 @@ class Elevation {
         self.continentScale = newValues[0]
         self.oceanRatio = newValues[1]
 
-        generateElevationGPU(from: mesh)
+        generateElevation(from: mesh)
     }
 
     func generateElevationGPU(from mesh: Mesh) {
@@ -300,9 +300,128 @@ class Elevation {
         } // end autoreleasepool
     }
 
+    func generateElevationCPU(from mesh: Mesh) {
+        let oceanWorld: Bool = oceanRatio >= 1.0
+        
+        // Store tile center positions for later use
+        var tilePositions = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: tileCount)
+
+        // First pass: Generate continent masks with values in 0-1 range
+        var rawContinentMask = [Float](repeating: 0, count: tileCount)
+
+        for i in 0..<tileCount {
+            let centerVertex = mesh.getVertex(forVertexIndex: mesh.tileIndex[i])
+            let pos = centerVertex.position.normalized()
+            tilePositions[i] = pos
+
+            // Generate large-scale continent shapes (very low frequency)
+            var continentValue: Float = 0
+            var amplitude: Float = 1.0
+            let persistence: Float = 0.5
+            let continentFrequencyBase: Float = 0.5 // Base lower frequency
+            let continentFrequency = continentFrequencyBase * continentScale // Apply the scale
+
+            // Use 3 octaves for continents - fewer octaves = larger features
+            for octave in 0..<3 {
+                let freq = continentFrequency * pow(2.0, Float(octave))
+                let noiseValue = sampleSphericalNoise(at: pos * freq)
+                continentValue += noiseValue * amplitude
+                amplitude *= persistence
+            }
+
+            // Normalize to 0-1
+            continentValue = (continentValue + 1.0) * 0.5
+
+            // Make continents more distinct with a curve
+            continentValue = pow(continentValue, 1.2)
+
+            rawContinentMask[i] = continentValue
+        }
+
+        // Smooth the continent mask
+        let continentMask = spatialSmoothing(values: rawContinentMask, positions: tilePositions, radius: 0.2, iterations: 3)
+
+        // Find threshold value that gives us desired ocean ratio
+        let sortedElevations = continentMask.sorted()
+        let thresholdIndex = Int(Float(tileCount) * oceanRatio)
+        let oceanThreshold = thresholdIndex < sortedElevations.count ? sortedElevations[thresholdIndex] : 0.5
+
+        // Second pass: Generate detailed terrain features with proper elevation range
+        for i in 0..<tileCount {
+            let pos = tilePositions[i]
+            let continentValue = continentMask[i]
+
+            // Determine if this is land or ocean
+            let isLand = continentValue > oceanThreshold
+
+            var elevation: Float
+
+            if isLand && !oceanWorld{
+                // Land: Scale from sea level (0.0) up to mountain peaks (highPeakLevel)
+
+                // How far above threshold are we (0-1 range)
+                let landRatio = (continentValue - oceanThreshold) / (1.0 - oceanThreshold)
+
+                // Generate detailed land terrain
+                let detailNoise = generateLandTerrain(at: pos)
+
+                // Combine base elevation with details
+                // Higher base elevation = higher mountains
+                elevation = landRatio * highPeakLevel * 0.7 + detailNoise * highPeakLevel * 0.3
+
+                // Add mountains near coastlines (modified logic)
+                let coastalDistance = abs(continentValue - oceanThreshold) * 15.0
+                if coastalDistance < 1.0 {
+                    let mountainFactor = sin(coastalDistance * Float.pi).clamped(to: 0...1) // Ensure factor is not negative
+                    let mountainNoise = sampleSphericalNoise(at: pos * 3.0 + SIMD3<Float>(1.5, 2.3, 3.1)) * 0.5 + 0.5 // Normalize noise to 0-1
+                    // Blend mountain noise with existing elevation
+                    elevation += mountainFactor * mountainNoise * highPeakLevel * 0.6 * (1.0 - landRatio * 0.5) // Reduce mountain height further inland
+                }
+
+                // Ensure minimum land elevation is at sea level
+                elevation = max(seaLevel, elevation)
+            } else {
+                // Ocean: Scale from ocean threshold (0.0) down to deep ocean (deepOceanLevel)
+
+                // How far below threshold are we (0-1 range)
+                let oceanRatio = (oceanThreshold - continentValue) / oceanThreshold
+
+                // Generate ocean floor terrain
+                let oceanFloorNoise = generateOceanTerrain(at: pos)
+
+                // Base ocean depth
+                elevation = -oceanRatio * abs(deepOceanLevel) * 0.7 - oceanFloorNoise * abs(deepOceanLevel) * 0.3
+
+                // Add trenches in deeper ocean areas
+                // Deep ocean starts when oceanRatio is above deepOceanStartRatio
+                if oceanRatio > deepOceanStartRatio {
+                    let trenchNoise = sampleSphericalNoise(at: pos * 2.0 + SIMD3<Float>(3.7, 1.9, 2.6))
+                    if trenchNoise > 0.6 { // Slightly lower threshold for trenches
+                        let trenchFactor = (trenchNoise - 0.6) / 0.4 // Adjust factor range
+                        elevation -= trenchFactor * abs(deepOceanLevel) * 0.6 // Deeper trenches
+                    }
+                }
+
+                // Ensure maximum ocean elevation is just below sea level
+                elevation = min(seaLevel - 0.01, elevation)
+            }
+
+            // Store the final elevation
+            heightMap[i] = elevation
+        }
+
+        // Apply final smoothing to reduce artifacts
+        heightMap = spatialSmoothing(values: heightMap, positions: tilePositions, radius: 0.05, iterations: 1)
+    }
+    
     func generateElevation(from mesh: Mesh) {
-        // Use GPU version instead
-        generateElevationGPU(from: mesh)
+        #if targetEnvironment(simulator)
+            print("Running in Simulator – using CPU generation")
+            generateElevationCPU(from: mesh)
+        #else
+            print("Running on real device – using GPU generation")
+            generateElevationGPU(from: mesh)
+        #endif
     }
 
     private func printElevationStats() {
