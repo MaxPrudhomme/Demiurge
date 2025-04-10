@@ -7,12 +7,13 @@ Demiurge is an iOS app that lets you create procedural planets.
 - **Elevation Control** – Shape your world's terrain height and variation.
 - **Temperature Control** – Adjust the climate dynamics across the planet.
 - **Humidity Control** – Influence the moisture levels to simulate diverse biomes.
+- **Observatory** - Save your newly generated planet and revisit old ones in the observatory.
 
 ### 📦 Current Version
-- Demiurge is currently in version 1.0.0.
+- Demiurge is currently in version 1.1.0.
 
 ### ⏳ Status
-- Demiurge is currently in active development.
+- Demiurge has reached the initial goals.
 
 
 Thank you for trying out Demiurge!
