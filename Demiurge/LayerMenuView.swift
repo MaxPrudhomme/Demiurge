@@ -12,6 +12,7 @@ struct LayerMenuButtonStyle: ButtonStyle {
         configuration.label
             .symbolEffect(.bounce.up.byLayer, value: configuration.isPressed)
             .foregroundStyle(.blue)
+            .accessibilityIdentifier("layerButton")
     }
 }
 
@@ -25,6 +26,7 @@ struct LayerMenuView: View {
             Picker(selection: $layer, label: Text("Layer options")) {
                 Label("Temperature", systemImage: "thermometer.high")
                 .tag("Temperature")
+                .accessibilityIdentifier("temperaturePicker")
                 
                 Label("Humidity", systemImage: "humidity")
                 .tag("Humidity")
@@ -34,6 +36,7 @@ struct LayerMenuView: View {
                 
                 Label("All layers", systemImage: "globe.americas")
                 .tag("All layers")
+                .accessibilityIdentifier("allLayerPicker")
             }
             .onChange(of: layer) { oldValue, newValue in
                 handleLayerChange(newValue)

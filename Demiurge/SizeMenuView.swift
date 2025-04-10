@@ -13,6 +13,7 @@ struct SizeMenuButtonStyle: ButtonStyle {
         configuration.label
             .symbolEffect(.bounce, value: configuration.isPressed)
             .foregroundStyle(.blue)
+            .accessibilityIdentifier("sizeButton")
     }
 }
 

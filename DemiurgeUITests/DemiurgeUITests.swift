@@ -4,39 +4,60 @@
 //
 //  Created by Max PRUDHOMME on 08/04/2025.
 //
-
 import XCTest
 
 final class DemiurgeUITests: XCTestCase {
 
+    var app: XCUIApplication!
+    var screen: XCUIScreen!
+
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
+        super.setUp()
+        
+        // Set up the app and screen recording
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+        app = XCUIApplication()
+        screen = XCUIScreen.main
     }
 
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        // Stop the screen recording if it's active
+        if screen.isRecording {
+            screen.stopRecording()
+        }
+        super.tearDown()
     }
 
     @MainActor
     func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
         app.launch()
+        
+        // Start screen recording
+        screen.startRecording()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        // Example UI interactions (replace with your actual app's features)
+        let button = app.buttons["Start Button"]
+        XCTAssertTrue(button.exists)
+        button.tap()
+
+        // Add more UI actions here as needed
+
+        // Stop recording after test actions
+        screen.stopRecording()
+
+        // Optionally, save or process the recording
+        let videoURL = screen.recordedVideoURL
+        print("Video saved to: \(videoURL.path)")
+
+        // Use assertions to verify that the app behaves as expected
+        XCTAssertTrue(app.staticTexts["Expected Text"].exists)
     }
 
     @MainActor
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
-            // This measures how long it takes to launch your application.
             measure(metrics: [XCTApplicationLaunchMetric()]) {
-                XCUIApplication().launch()
+                app.launch()
             }
         }
     }

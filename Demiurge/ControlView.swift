@@ -39,6 +39,7 @@ struct ControlView: View {
                 })
                 .padding(.leading, 8)
                 .padding(.trailing, 8)
+                .accessibilityIdentifier(rotate ? "rotateOn" : "rotateOff")
                 
                 Button(action: {
                     resetZoom()
@@ -50,6 +51,7 @@ struct ControlView: View {
                         .symbolEffect(.bounce, value: bounce_glass)
                 })
                 .padding(8)
+                .accessibilityIdentifier("resetZoom")
             }
             .background(Material.regularMaterial)
             .cornerRadius(12)

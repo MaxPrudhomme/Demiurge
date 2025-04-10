@@ -43,6 +43,7 @@ struct EditorView: View {
                         .frame(width: 40, height: 5)
                         .cornerRadius(2.5)
                         .padding(.top, 10)
+                        .accessibilityIdentifier("editorDraggable")
                     
                     HStack {
                         Button(action: {
@@ -53,6 +54,7 @@ struct EditorView: View {
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
                                 .symbolEffect(.bounce.up.byLayer, value: bounce_binoculars)
+                                .accessibilityIdentifier("observatoryButton")
                                 
                         })
                         Spacer()
@@ -67,6 +69,7 @@ struct EditorView: View {
                                 .font(.system(size: 24))
                                 .frame(width: 32, height: 32)
                                 .symbolEffect(.bounce.up.byLayer, value: bounce_dice)
+                                .accessibilityIdentifier("randomizeButton")
                                 
                         })
                     }

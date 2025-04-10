@@ -96,6 +96,7 @@ struct ObservatoryView: View {
                         Image(systemName: "square.and.arrow.down")
                     }
                     .padding(.trailing, 8)
+                    .accessibilityIdentifier("saveButton")
                 }
             }
         }

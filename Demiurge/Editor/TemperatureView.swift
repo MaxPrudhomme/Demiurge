@@ -85,6 +85,7 @@ struct TemperatureView: View {
                     .onChange(of: polarTemperatureDrop) { oldValue, newValue in
                         renderControl.temperatureController[1] = newValue
                     }
+                    .accessibilityIdentifier("poleDropSlider")
 
                 Text("\(String(format: "%.2f", polarTemperatureDrop))")
                     .frame(width: 40)

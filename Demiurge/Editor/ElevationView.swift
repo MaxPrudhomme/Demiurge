@@ -48,6 +48,7 @@ struct ElevationView: View {
                     .onChange(of: continentScale) { oldValue, newValue in
                         renderControl.elevationController[0] = newValue
                     }
+                    .accessibilityIdentifier("elevationSlider")
                 
                 Text("\(String(format: "%.1f", continentScale))")
                     .frame(width: 32)
